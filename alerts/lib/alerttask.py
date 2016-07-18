@@ -432,6 +432,7 @@ class AlertTask(Task):
                 'documentsource': e['_source'],
                 'documentid': e['_id']})
         self.log.debug(alert)
+        self.alert = alert
         return alert
 
 
