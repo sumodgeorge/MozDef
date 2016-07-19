@@ -156,3 +156,22 @@ class TestCorrelatedIntelNoticeWithUnmatchedNote(ParentCorrelatedIntelNoticeTest
 
     def verify_alert(self):
         self.verify_alert_not_fired()
+
+
+class TestCorrelatedIntelNoticeOldTimestampDoesntExist(ParentCorrelatedIntelNoticeTest):
+
+    def events(self):
+        default_event = self.generate_default_event()
+        custom_timestamp = self.helper.subtract_from_timestamp(self.helper.current_timestamp(), dict(minutes=16))
+        default_event['receivedtimestamp'] = custom_timestamp
+        default_event['utctimestamp'] = custom_timestamp
+        default_event['timestamp'] = custom_timestamp
+
+        events = [
+          default_event
+        ]
+
+        return events
+
+    def verify_alert(self):
+        self.verify_alert_not_fired()

@@ -109,3 +109,20 @@ class TestDuoFailOpenIncorrectSummary(ParentDuoFailOpenTest):
         self.verify_alert_not_fired()
 
 
+class TestDuoFailOpenOldTimestampDoesntExist(ParentDuoFailOpenTest):
+    def events(self):
+        events = []
+        for a in range(1, 15):
+            event = self.generate_default_event()
+            custom_timestamp = self.helper.subtract_from_timestamp(self.helper.current_timestamp(), dict(minutes=16))
+            event['receivedtimestamp'] = custom_timestamp
+            event['utctimestamp'] = custom_timestamp
+            event['timestamp'] = custom_timestamp
+
+            events.append(event)
+
+        return events
+
+    def verify_alert(self):
+        self.verify_alert_not_fired()
+
