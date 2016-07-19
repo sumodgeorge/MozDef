@@ -82,6 +82,8 @@ def getValueByPath(input_dict, path_string):
 
 class AlertTask(Task):
 
+    abstract = True
+
     def __init__(self):
         self.alert_name = self.__class__.__name__
         self.filter = None
@@ -92,6 +94,8 @@ class AlertTask(Task):
         # List of aggregations
         # e.g. when aggregField is email: [{value:'evil@evil.com',count:1337,events:[...]}, ...]
         self.aggregations = None
+        # Alert ES dict
+        self.alert = None
 
         self.log.debug('starting {0}'.format(self.alert_name))
         self.log.debug(RABBITMQ)
