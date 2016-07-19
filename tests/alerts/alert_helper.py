@@ -10,27 +10,29 @@ from datetime import timedelta
 from dateutil.parser import parse
 import pytz
 
+class ElasticsearchException(Exception):
+  pass
+
 class TestHelper():
   def __init__(self, elasticsearch_host):
     self.elasticsearch_host = elasticsearch_host.replace("http://","")
 
-  def event_to_es(self, json_data, index='events'):
+  def event_to_es(self, json_data, index, event_type):
     post_data = json.dumps(json_data)
     conn = httplib.HTTPConnection(self.elasticsearch_host)
-    conn.request("POST", "/" + index + "/event/", post_data)
+    conn.request("POST", "/" + index + "/" + event_type + "/", post_data)
     response = conn.getresponse()
     conn.close()
-    if response.status == 201:
-      print "[+] Successfully inserted into elasticsearch at " + self.elasticsearch_host + " in index " + index
-    else:
-      print response.status, response.reason
+    if response.status != 201:
+      raise ElasticsearchException('Unable to insert at ' + index + ' for ' + self.elasticsearch_host)
 
-  def delete_index_if_exists(self, index_name):
+  def delete_index_if_exists(self, index_name, error=True):
     conn = httplib.HTTPConnection(self.elasticsearch_host)
     conn.request('DELETE', index_name)
     response = conn.getresponse()
     body = response.read()
-    return body
+    if error and response.status != 200:
+      raise ElasticsearchException('Unable to delete index ' + index_name)
 
   def get_alert_by_id(self, id):
     conn = httplib.HTTPConnection(self.elasticsearch_host)
