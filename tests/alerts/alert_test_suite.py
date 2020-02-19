@@ -2,26 +2,62 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 import os.path
 import sys
+import logging
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
-
-from unit_test_suite import UnitTestSuite
+from tests.unit_test_suite import UnitTestSuite
 
 from freezegun import freeze_time
+import mock
 
 import copy
 import re
 import json
 
 
+def mock_add_hostname_to_ip(ip):
+    if ip == '10.2.3.4':
+        return ['mock_hostname1.mozilla.org', ip]
+    else:
+        return ['mock.mozilla.org', ip]
+
+
 class AlertTestSuite(UnitTestSuite):
+    def teardown(self):
+        os.chdir(self.orig_path)
+        super().teardown()
+        sys.path.remove(self.alerts_path)
+        sys.path.remove(self.alerts_lib_path)
+        if 'lib' in sys.modules:
+            del sys.modules['lib']
+
     def setup(self):
-        super(AlertTestSuite, self).setup()
+        self.orig_path = os.getcwd()
+        super().setup()
+        self.alerts_path = os.path.join(os.path.dirname(__file__), "../../alerts")
+        self.alerts_lib_path = os.path.join(os.path.dirname(__file__), "../../alerts/lib")
+        sys.path.insert(0, self.alerts_path)
+        sys.path.insert(0, self.alerts_lib_path)
+        from lib import alerttask
+
+        # Overwrite the ES and RABBITMQ configs for alerts
+        # since it pulls it from alerts/lib/config.py
+        alerttask.ES = {
+            'servers': list('{0}'.format(s) for s in self.options.esservers)
+        }
+        alerttask.RABBITMQ = {
+            'mquser': self.options.mquser,
+            'alertexchange': self.options.alertExchange,
+            'alertqueue': self.options.alertqueue,
+            'mqport': self.options.mqport,
+            'mqserver': self.options.mqserver,
+            'mqpassword': self.options.mqpassword,
+            'mqalertserver': self.options.mqalertserver
+        }
 
         alerts_dir = os.path.join(os.path.dirname(__file__), "../../alerts/")
         os.chdir(alerts_dir)
@@ -48,6 +84,10 @@ class AlertTestSuite(UnitTestSuite):
         if not hasattr(self, 'deadman'):
             self.deadman = False
 
+        # Log to stdout so pytest will report any
+        # stack traces on any test failures
+        logging.basicConfig(stream=sys.stdout, level=logging.ERROR)
+
     # Some housekeeping stuff here to make sure the data we get is 'good'
     def verify_starting_values(self, test_case):
         # Verify the description for the test case is populated
@@ -55,7 +95,6 @@ class AlertTestSuite(UnitTestSuite):
         assert test_case.description is not ""
 
         # Verify alert_filename is a legit file
-        # full_alert_file_path = "../../../alerts/" + self.alert_filename + ".py"
         full_alert_file_path = "./" + self.alert_filename + ".py"
         assert os.path.isfile(full_alert_file_path) is True
 
@@ -64,7 +103,9 @@ class AlertTestSuite(UnitTestSuite):
         # gonna grep for class name
         alert_source_str = open(full_alert_file_path, 'r').read()
         class_search_str = "class " + self.alert_classname + "("
-        assert class_search_str in alert_source_str
+        error_text = "Incorrect alert classname. We tried guessing the class name ({0}), but that wasn't it.".format(self.alert_classname)
+        error_text += ' Define self.alert_classname in your alert unit test class.'
+        assert class_search_str in alert_source_str, error_text
 
         # Verify events is not empty
         assert len(test_case.events) is not 0
@@ -90,7 +131,7 @@ class AlertTestSuite(UnitTestSuite):
         obj = args[0]
         if not isinstance(obj, dict):
             return obj
-        for k, v in obj.iteritems():
+        for k, v in obj.items():
             if k in target and isinstance(target[k], dict):
                 self.dict_merge(target[k], v)
             else:
@@ -100,13 +141,6 @@ class AlertTestSuite(UnitTestSuite):
     @freeze_time("2017-01-01 01:00:00", tz_offset=0)
     def test_alert_test_case(self, test_case):
         self.verify_starting_values(test_case)
-        if test_case.expected_test_result is True:
-            # if we dont set notify_mozdefbot field, autoset it to True
-            if 'notify_mozdefbot' not in test_case.expected_alert:
-                test_case.expected_alert['notify_mozdefbot'] = True
-            if 'ircchannel' not in test_case.expected_alert:
-                test_case.expected_alert['ircchannel'] = None
-
         temp_events = test_case.events
         for event in temp_events:
             temp_event = self.dict_merge(self.generate_default_event(), self.default_event)
@@ -117,21 +151,26 @@ class AlertTestSuite(UnitTestSuite):
             test_case.full_events.append(merged_event)
             self.populate_test_event(merged_event['_source'])
 
-        self.flush('events')
+        self.refresh('events')
 
-        alert_task = test_case.run(alert_filename=self.alert_filename, alert_classname=self.alert_classname)
+        with mock.patch("socket.gethostbyaddr", side_effect=mock_add_hostname_to_ip):
+            alert_task = test_case.run(alert_filename=self.alert_filename, alert_classname=self.alert_classname)
         self.verify_alert_task(alert_task, test_case)
 
     def verify_rabbitmq_alert(self, found_alert, test_case):
         rabbitmq_message = self.rabbitmq_alerts_consumer.channel.basic_get()
         rabbitmq_message.channel.basic_ack(rabbitmq_message.delivery_tag)
         document = json.loads(rabbitmq_message.body)
-        assert document['notify_mozdefbot'] is test_case.expected_alert['notify_mozdefbot'], 'Alert from rabbitmq has bad notify_mozdefbot field'
-        assert document['ircchannel'] == test_case.expected_alert['ircchannel'], 'Alert from rabbitmq has bad ircchannel field'
-        assert document['summary'] == found_alert['_source']['summary'], 'Alert from rabbitmq has bad summary field'
-        assert document['utctimestamp'] == found_alert['_source']['utctimestamp'], 'Alert from rabbitmq has bad utctimestamp field'
-        assert document['category'] == found_alert['_source']['category'], 'Alert from rabbitmq has bad category field'
-        assert len(document['events']) == len(found_alert['_source']['events']), 'Alert from rabbitmq has bad events field'
+        assert '_id' in document
+        assert '_source' in document
+        assert '_index' in document
+        alert_body = document['_source']
+        assert alert_body['notify_mozdefbot'] is test_case.expected_alert['notify_mozdefbot'], 'Alert from rabbitmq has bad notify_mozdefbot field'
+        assert alert_body['ircchannel'] == test_case.expected_alert['ircchannel'], 'Alert from rabbitmq has bad ircchannel field'
+        assert alert_body['summary'] == found_alert['_source']['summary'], 'Alert from rabbitmq has bad summary field'
+        assert alert_body['utctimestamp'] == found_alert['_source']['utctimestamp'], 'Alert from rabbitmq has bad utctimestamp field'
+        assert alert_body['category'] == found_alert['_source']['category'], 'Alert from rabbitmq has bad category field'
+        assert len(alert_body['events']) == len(found_alert['_source']['events']), 'Alert from rabbitmq has bad events field'
 
     def verify_saved_events(self, found_alert, test_case):
         """
@@ -142,7 +181,12 @@ class AlertTestSuite(UnitTestSuite):
         if self.deadman:
             return
 
-        assert len(found_alert['_source']['events']) == len(test_case.full_events)
+        # If we override the number of expected events, let's use that value
+        num_events = len(test_case.full_events)
+        if hasattr(self, 'num_samples'):
+            num_events = self.num_samples
+        assert len(found_alert['_source']['events']) == num_events
+
         for event in found_alert['_source']['events']:
             event_id = event['documentid']
             found_event = self.es_client.get_event_by_id(event_id)
@@ -157,33 +201,42 @@ class AlertTestSuite(UnitTestSuite):
         assert found_alert['_index'] == self.alert_index_name, 'Alert index not propertly set, got: {}'.format(found_alert['_index'])
 
         # Verify that the alert has the right "look to it"
-        assert found_alert.keys() == ['_score', '_type', '_id', '_source', '_index'], 'Alert format is malformed'
+        assert sorted(found_alert.keys()) == ['_id', '_index', '_score', '_source'], 'Alert format is malformed'
 
-        # Verify the alert has an id field that is unicode
-        assert type(found_alert['_id']) == unicode, 'Alert _id is not an integer'
+        # Verify the alert has an id field that is str
+        assert type(found_alert['_id']) == str, 'Alert _id is malformed'
 
         # Verify there is a utctimestamp field
         assert 'utctimestamp' in found_alert['_source'], 'Alert does not have utctimestamp specified'
 
-        # Verify notify_mozdefbot is set correctly
-        assert found_alert['_source']['notify_mozdefbot'] is test_case.expected_alert['notify_mozdefbot'], 'Alert notify_mozdefbot field is bad'
+        if 'ircchannel' not in test_case.expected_alert:
+            test_case.expected_alert['ircchannel'] = None
+
+        # Verify notify_mozdefbot is set correctly based on severity
+        expected_notify_mozdefbot = True
+        if (test_case.expected_alert['severity'] == 'NOTICE' or test_case.expected_alert['severity'] == 'INFO') and test_case.expected_alert['ircchannel'] is None:
+            expected_notify_mozdefbot = False
+        test_case.expected_alert['notify_mozdefbot'] = expected_notify_mozdefbot
 
         # Verify ircchannel is set correctly
         assert found_alert['_source']['ircchannel'] == test_case.expected_alert['ircchannel'], 'Alert ircchannel field is bad'
+
+        # Verify classname is set correctly
+        assert found_alert['_source']['classname'] == self.alert_classname, 'Alert classname field is bad'
 
         # Verify the events are added onto the alert
         assert type(found_alert['_source']['events']) == list, 'Alert events field is not a list'
 
         # Verify that the alert properties are set correctly
-        for key, value in test_case.expected_alert.iteritems():
-            assert found_alert['_source'][key] == value, u'{0} does not match!\n\tgot: {1}\n\texpected: {2}'.format(key, found_alert['_source'][key], value)
+        for key, value in test_case.expected_alert.items():
+            assert found_alert['_source'][key] == value, '{0} does not match!\n\tgot: {1}\n\texpected: {2}'.format(key, found_alert['_source'][key], value)
 
     def verify_alert_task(self, alert_task, test_case):
         assert alert_task.classname() == self.alert_classname, 'Alert classname did not match expected name'
         if test_case.expected_test_result is True:
             assert len(alert_task.alert_ids) is not 0, 'Alert did not fire as expected'
-            self.flush('alerts')
-            self.flush('events')
+            self.refresh('alerts')
+            self.refresh('events')
             for alert_id in alert_task.alert_ids:
                 found_alert = self.es_client.get_alert_by_id(alert_id)
                 self.verify_expected_alert(found_alert, test_case)
@@ -199,7 +252,7 @@ class AlertTestSuite(UnitTestSuite):
     @staticmethod
     def create_events(default_event, num_events):
         events = []
-        for num in xrange(num_events):
+        for num in range(num_events):
             events.append(AlertTestSuite.create_event(default_event))
         return events
 

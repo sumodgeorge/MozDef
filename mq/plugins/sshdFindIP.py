@@ -1,6 +1,6 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 import netaddr
@@ -30,22 +30,22 @@ class message(object):
         # get events that may include an unparsed IP in the summary
         self.registration = ['sshd', 'fail2ban']
         self.priority = 5
-        
+
     def onMessage(self, message, metadata):
         # if we don't have a source IP address
-        # look for words that are IP addresses, 
+        # look for words that are IP addresses,
         # move to details.sourceipaddress
         doSearch = False
         detailsExists = True
         foundIPv4 = ''
-        if 'summary' in message.keys():
-            if 'details' in message.keys() and isinstance(message['details'], dict):
-                if 'sourceipaddress' not in message['details'].keys():
+        if 'summary' in message:
+            if 'details' in message and isinstance(message['details'], dict):
+                if 'sourceipaddress' not in message['details']:
                     doSearch = True
             else:
                 doSearch = True
                 detailsExists = False
-            
+
             if doSearch:
                 for word in message['summary'].strip().split():
                     # strip any surrounding quotes, commas, etc.

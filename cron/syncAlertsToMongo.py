@@ -2,45 +2,19 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 import calendar
-import logging
 import random
 import sys
-from datetime import datetime
 from configlib import getConfig, OptionParser
-from logging.handlers import SysLogHandler
 from pymongo import MongoClient
 
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from utilities.toUTC import toUTC
-from elasticsearch_client import ElasticsearchClient
-from query_models import SearchQuery, TermMatch
-
-logger = logging.getLogger(sys.argv[0])
-
-
-def loggerTimeStamp(self, record, datefmt=None):
-    return toUTC(datetime.now()).isoformat()
-
-
-def initLogger():
-    logger.level = logging.INFO
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    formatter.formatTime = loggerTimeStamp
-    if options.output == 'syslog':
-        logger.addHandler(
-            SysLogHandler(
-                address=(options.sysloghostname, options.syslogport)))
-    else:
-        sh = logging.StreamHandler(sys.stderr)
-        sh.setFormatter(formatter)
-        logger.addHandler(sh)
+from mozdef_util.utilities.logger import logger, initLogger
+from mozdef_util.utilities.toUTC import toUTC
+from mozdef_util.elasticsearch_client import ElasticsearchClient
+from mozdef_util.query_models import SearchQuery, ExistsMatch
 
 
 def genMeteorID():
@@ -49,7 +23,9 @@ def genMeteorID():
 
 def getESAlerts(es):
     search_query = SearchQuery(minutes=50)
-    search_query.add_must(TermMatch('_type', 'alert'))
+    # We use an ExistsMatch here just to satisfy the
+    # requirements of a search query must have some "Matchers"
+    search_query.add_must(ExistsMatch('summary'))
     results = search_query.execute(es, indices=['alerts'], size=10000)
     return results
 
@@ -77,7 +53,7 @@ def updateMongo(mozdefdb, esAlerts):
             mrecord = a['_source']
             # generate a meteor-compatible ID
             mrecord['_id'] = genMeteorID()
-            # capture the elastic search meta data (index/id/doctype)
+            # capture the elastic search meta data (index/id/type)
             # set the date back to a datetime from unicode, so mongo/meteor can properly sort, select.
             mrecord['utctimestamp']=toUTC(mrecord['utctimestamp'])
             # also set an epoch time field so minimongo can sort
@@ -85,7 +61,6 @@ def updateMongo(mozdefdb, esAlerts):
             mrecord['esmetadata'] = dict()
             mrecord['esmetadata']['id'] = a['_id']
             mrecord['esmetadata']['index'] = a['_index']
-            mrecord['esmetadata']['type'] = a['_type']
             alerts.insert(mrecord)
 
 

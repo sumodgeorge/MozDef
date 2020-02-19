@@ -2,7 +2,7 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 import json
@@ -13,10 +13,8 @@ import logging
 from configlib import getConfig, OptionParser
 from datetime import datetime, date, timedelta
 
-import os
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from elasticsearch_client import ElasticsearchClient
-from utilities.logger import logger
+from mozdef_util.elasticsearch_client import ElasticsearchClient
+from mozdef_util.utilities.logger import logger
 
 
 def esConnect(conn):
@@ -48,7 +46,7 @@ def isJVMMemoryHigh():
 
 def clearESCache():
     es = esConnect(None)
-    indexes = es.get_indices()
+    indexes = es.get_open_indices()
     # assums index names  like events-YYYYMMDD etc.
     # used to avoid operating on current indexes
     dtNow = datetime.utcnow()

@@ -2,19 +2,18 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 
-import sys
 import os
 from operator import itemgetter
 from datetime import datetime
 import pynsive
+import importlib
 
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from utilities.dict2List import dict2List
-from utilities.logger import logger
+from mozdef_util.utilities.dict2List import dict2List
+from mozdef_util.utilities.logger import logger
 
 
 def sendEventToPlugins(anevent, metadata, pluginList):
@@ -30,12 +29,15 @@ def sendEventToPlugins(anevent, metadata, pluginList):
 
     # expecting tuple of module,criteria,priority in pluginList
     # sort the plugin list by priority
+    executed_plugins = []
     for plugin in sorted(pluginList, key=itemgetter(2), reverse=False):
         # assume we don't run this event through the plugin
         send = False
         if isinstance(plugin[1], list):
             try:
-                if (set(plugin[1]).intersection([e for e in dict2List(anevent)])):
+                plugin_matching_keys = set([item.lower() for item in plugin[1]])
+                event_tokens = [e for e in dict2List(anevent)]
+                if plugin_matching_keys.intersection(event_tokens):
                     send = True
             except TypeError:
                 logger.error('TypeError on set intersection for dict {0}'.format(anevent))
@@ -46,6 +48,10 @@ def sendEventToPlugins(anevent, metadata, pluginList):
                 # plug-in is signalling to drop this message
                 # early exit
                 return (anevent, metadata)
+            plugin_name = plugin[0].__module__.replace('plugins.', '')
+            executed_plugins.append(plugin_name)
+    # Tag all events with what plugins ran on it
+    anevent['plugins'] = executed_plugins
 
     return (anevent, metadata)
 
@@ -56,13 +62,15 @@ def registerPlugins():
         modules = pynsive.list_modules('plugins')
         for mname in modules:
             module = pynsive.import_module(mname)
-            reload(module)
+            importlib.reload(module)
             if not module:
                 raise ImportError('Unable to load module {}'.format(mname))
             else:
                 if 'message' in dir(module):
                     mclass = module.message()
                     mreg = mclass.registration
+                    if type(mreg) != list:
+                        raise ImportError('Plugin {0} registration needs to be a list'.format(mname))
                     if 'priority' in dir(mclass):
                         mpriority = mclass.priority
                     else:

@@ -1,6 +1,6 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 
@@ -8,7 +8,7 @@ class message(object):
     def __init__(self):
         '''
         takes an incoming message
-        and sets the doc_type
+        and sets the type
         '''
 
         self.registration = ['google']
@@ -20,15 +20,12 @@ class message(object):
         # and do any clean up
 
         # check for details.kind like 'admin#reports#activity'
-        if ( 'details' in message.keys() and
-             'kind' in message['details'].keys() and
-             'activity' in message['details']['kind']):
-
+        if ('details' in message and 'kind' in message['details'] and
+                'activity' in message['details']['kind']):
             # details.etag might be quoted..unquote it
-            if 'etag' in message['details'].keys():
+            if 'etag' in message['details']:
                 message['details']['etag'] = message['details']['etag'].replace('"', '')
 
-            metadata['doc_type']= 'google'
-
+            message['type'] = 'google'
 
         return (message, metadata)

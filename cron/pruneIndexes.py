@@ -2,7 +2,7 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 # set this to run as a cronjob (after backup has completed)
@@ -12,47 +12,31 @@
 # Create a starter .conf file with backupDiscover.py
 
 import sys
-import logging
 from datetime import datetime
 from datetime import date
 from datetime import timedelta
 from configlib import getConfig, OptionParser
 
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from utilities.toUTC import toUTC
-from elasticsearch_client import ElasticsearchClient
-
-
-logger = logging.getLogger(sys.argv[0])
-logger.level=logging.WARNING
-formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
+from mozdef_util.utilities.toUTC import toUTC
+from mozdef_util.utilities.logger import logger
+from mozdef_util.elasticsearch_client import ElasticsearchClient
 
 
 def esPruneIndexes():
-    if options.output == 'syslog':
-        logger.addHandler(SysLogHandler(address=(options.sysloghostname, options.syslogport)))
-    else:
-        sh = logging.StreamHandler(sys.stderr)
-        sh.setFormatter(formatter)
-        logger.addHandler(sh)
-
     logger.debug('started')
     try:
         es = ElasticsearchClient((list('{0}'.format(s) for s in options.esservers)))
         indices = es.get_indices()
         # do the pruning
-        for (index, dobackup, rotation, pruning) in zip(options.indices,
-            options.dobackup, options.rotation, options.pruning):
+        for (index, dobackup, rotation, pruning) in zip(options.indices, options.dobackup, options.rotation, options.pruning):
             try:
                 if pruning != '0':
                     index_to_prune = index
                     if rotation == 'daily':
-                        idate = date.strftime(toUTC(datetime.now()) - timedelta(days=int(pruning)),'%Y%m%d')
+                        idate = date.strftime(toUTC(datetime.now()) - timedelta(days=int(pruning)), '%Y%m%d')
                         index_to_prune += '-%s' % idate
                     elif rotation == 'monthly':
-                        idate = date.strftime(datetime.utcnow() - timedelta(days=31*int(pruning)),'%Y%m')
+                        idate = date.strftime(datetime.utcnow() - timedelta(days=31 * int(pruning)), '%Y%m')
                         index_to_prune += '-%s' % idate
 
                     if index_to_prune in indices:
@@ -64,7 +48,7 @@ def esPruneIndexes():
                 logger.error("Unhandled exception while deleting %s, terminating: %r" % (index_to_prune, e))
 
     except Exception as e:
-        logger.error("Unhandled exception, terminating: %r"%e)
+        logger.error("Unhandled exception, terminating: %r" % e)
 
 
 def initConfig():
@@ -73,43 +57,44 @@ def initConfig():
         'output',
         'stdout',
         options.configfile
-        )
+    )
     # syslog hostname
     options.sysloghostname = getConfig(
         'sysloghostname',
         'localhost',
         options.configfile
-        )
+    )
     options.syslogport = getConfig(
         'syslogport',
         514,
         options.configfile
-        )
+    )
     options.esservers = list(getConfig(
         'esservers',
         'http://localhost:9200',
         options.configfile).split(',')
-        )
+    )
     options.indices = list(getConfig(
         'backup_indices',
         'events,alerts,.kibana',
         options.configfile).split(',')
-        )
+    )
     options.dobackup = list(getConfig(
         'backup_dobackup',
         '1,1,1',
         options.configfile).split(',')
-        )
+    )
     options.rotation = list(getConfig(
         'backup_rotation',
         'daily,monthly,none',
         options.configfile).split(',')
-        )
+    )
     options.pruning = list(getConfig(
         'backup_pruning',
         '20,0,0',
         options.configfile).split(',')
-        )
+    )
+
 
 if __name__ == '__main__':
     parser = OptionParser()

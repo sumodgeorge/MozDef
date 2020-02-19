@@ -2,11 +2,11 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2015 Mozilla Corporation
 
 from lib.alerttask import AlertTask
-from query_models import SearchQuery, TermMatch, QueryStringMatch, PhraseMatch
+from mozdef_util.query_models import SearchQuery, TermMatch, QueryStringMatch, PhraseMatch
 import re
 from configlib import getConfig, OptionParser
 
@@ -31,7 +31,7 @@ class AlertUnauthSSH(AlertTask):
         search_query.add_must([
             TermMatch('category', 'syslog'),
             TermMatch('details.program', 'sshd'),
-            QueryStringMatch('details.hostname: /{}/'.format(self.config.hostfilter)),
+            QueryStringMatch('hostname: /{}/'.format(self.config.hostfilter)),
             PhraseMatch('summary', 'Accepted publickey for {}'.format(self.config.user))
         ])
 
@@ -58,14 +58,14 @@ class AlertUnauthSSH(AlertTask):
         targethost = 'unknown'
         sourceipaddress = 'unknown'
         x = event['_source']
+        if 'hostname' in x:
+            targethost = x['hostname']
         if 'details' in x:
-            if 'hostname' in x['details']:
-                targethost = x['details']['hostname']
             if 'sourceipaddress' in x['details']:
                 sourceipaddress = x['details']['sourceipaddress']
 
         targetuser = 'unknown'
-        expr = re.compile('Accepted publickey for ([A-Za-z0-9@.\-]+) from')
+        expr = re.compile(r'Accepted publickey for ([A-Za-z0-9@.\-]+) from')
         m = expr.match(event['_source']['summary'])
         groups = m.groups()
         if len(groups) > 0:

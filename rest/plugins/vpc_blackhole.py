@@ -1,15 +1,15 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 import os
-import sys
-import ConfigParser
-from datetime import datetime, timedelta
-import json
+import configparser
 import netaddr
 from boto3.session import Session
+
+from mozdef_util.utilities.logger import logger
+
 
 def isIPv4(ip):
     try:
@@ -64,18 +64,18 @@ class message(object):
         self.options = None
         self.multioptions = []
         if os.path.exists(self.configfile):
-            sys.stdout.write('found conf file {0}\n'.format(self.configfile))
+            logger.debug('found conf file {0}\n'.format(self.configfile))
             self.initConfiguration()
 
     def initConfiguration(self):
-        myparser = ConfigParser.ConfigParser()
+        myparser = configparser.ConfigParser()
         myparser.read(self.configfile)
         cur_sections = myparser.sections()
         for cur_section in cur_sections:
             if cur_section is not None:
                 cur_options = myparser.options(cur_section)
                 if cur_options is not None:
-                    self.multioptions.append({ 'region': myparser.get(cur_section, 'region'), 'aws_access_key_id': myparser.get(cur_section, 'aws_access_key_id'), 'aws_secret_access_key': myparser.get(cur_section, 'aws_secret_access_key') } )
+                    self.multioptions.append({'region': myparser.get(cur_section, 'region'), 'aws_access_key_id': myparser.get(cur_section, 'aws_access_key_id'), 'aws_secret_access_key': myparser.get(cur_section, 'aws_secret_access_key')})
 
     def addBlackholeEntry(self,
                           ipaddress=None):
@@ -88,13 +88,11 @@ class message(object):
                     region_name = cur_account['region']
 
                     session = Session(aws_access_key_id=aws_access_key_id,
-                                  aws_secret_access_key=aws_secret_access_key,
-                                  region_name=region_name)
+                                      aws_secret_access_key=aws_secret_access_key,
+                                      region_name=region_name)
 
                     ec2 = session.resource('ec2')
                     client = session.client('ec2')
-                    #ec2 = session.resource('ec2', region_name=region_name, aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
-                    #client = session.client('ec2', region_name=region_name, aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
 
                     response = client.describe_route_tables()
                     for routetable in response['RouteTables']:
@@ -103,56 +101,55 @@ class message(object):
                         if len(routetable['Associations']) > 0:
                             if 'SubnetId' in routetable['Associations'][0]:
                                 subnet_id = routetable['Associations'][0]['SubnetId']
-                        sys.stdout.write('{0} {1}\n'.format(rt_id, vpc_id))
+                        logger.debug('{0} {1}\n'.format(rt_id, vpc_id))
 
                         response = client.describe_network_interfaces(
-                                Filters=[
-                                    {
-                                        'Name': 'description',
-                                        'Values': [
-                                            'blackhole',
-                                        ]
-                                    },
-                                    {
-                                        'Name': 'group-name',
-                                        'Values': [
-                                            'blackhole',
-                                        ]
-                                    },
-                                    {
-                                        'Name': 'vpc-id',
-                                        'Values': [
-                                            vpc_id,
-                                        ]
-                                    },
-                                    {
-                                        'Name': 'subnet-id',
-                                        'Values': [
-                                             subnet_id,
-                                        ]
-                                    },
-                                ]
-                                )
+                            Filters=[
+                                {
+                                    'Name': 'description',
+                                    'Values': [
+                                        'blackhole',
+                                    ]
+                                },
+                                {
+                                    'Name': 'group-name',
+                                    'Values': [
+                                        'blackhole',
+                                    ]
+                                },
+                                {
+                                    'Name': 'vpc-id',
+                                    'Values': [
+                                        vpc_id,
+                                    ]
+                                },
+                                {
+                                    'Name': 'subnet-id',
+                                    'Values': [
+                                        subnet_id,
+                                    ]
+                                },
+                            ]
+                        )
 
-                        sys.stdout.write('{0}\n'.format(response))
+                        logger.debug('{0}\n'.format(response))
                         if len(response['NetworkInterfaces']) > 0:
                             bheni_id = response['NetworkInterfaces'][0]['NetworkInterfaceId']
-                            sys.stdout.write('{0} {1} {2}\n'.format(rt_id, vpc_id, bheni_id))
+                            logger.debug('{0} {1} {2}\n'.format(rt_id, vpc_id, bheni_id))
 
                             # get a handle to a route table associated with a netsec-private subnet
                             route_table = ec2.RouteTable(rt_id)
 
                             response = route_table.create_route(
-                                                        DestinationCidrBlock=ipaddress,
-                                                        NetworkInterfaceId=bheni_id,
-                                                        )
+                                DestinationCidrBlock=ipaddress,
+                                NetworkInterfaceId=bheni_id,
+                            )
                         else:
-                            sys.stdout.write('Skipping route table {0} in the VPC {1} - blackhole ENI could not be found\n'.format(rt_id, vpc_id))
+                            logger.debug('Skipping route table {0} in the VPC {1} - blackhole ENI could not be found\n'.format(rt_id, vpc_id))
                             continue
 
         except Exception as e:
-            sys.stderr.write('Error while creating a blackhole entry %s: %r\n' % (ipaddress, e))
-
+            logger.error('Error while creating a blackhole entry %s: %r\n' % (ipaddress, e))
 
     def onMessage(self, request, response):
         '''
@@ -162,35 +159,33 @@ class message(object):
         '''
         # format/validate request.json:
         ipaddress = None
-        CIDR = None
         sendToBHVPC = False
 
         # loop through the fields of the form
         # and fill in our values
         try:
-            for i in request.json:
+            for field in request.json:
                 # were we checked?
-                if self.name in i.keys():
-                    sendToBHVPC = i.values()[0]
-                if 'ipaddress' in i.keys():
-                    ipaddress = i.values()[0]
-
+                if self.name in field:
+                    sendToBHVPC = field[self.name]
+                if 'ipaddress' in field:
+                    ipaddress = field['ipaddress']
             # are we configured?
             if self.multioptions is None:
-                sys.stderr.write("Customs server blockip requested but not configured\n")
+                logger.error("Customs server blockip requested but not configured\n")
                 sendToBHVPC = False
 
             if sendToBHVPC and ipaddress is not None:
-                #figure out the CIDR mask
+                # figure out the CIDR mask
                 if isIPv4(ipaddress) or isIPv6(ipaddress):
-                    ipcidr=netaddr.IPNetwork(ipaddress)
+                    ipcidr = netaddr.IPNetwork(ipaddress)
                     if not ipcidr.ip.is_loopback() \
                        and not ipcidr.ip.is_private() \
                        and not ipcidr.ip.is_reserved():
-                        ipaddress =  str(ipcidr.cidr)
+                        ipaddress = str(ipcidr.cidr)
                         self.addBlackholeEntry(ipaddress)
-                        sys.stdout.write ('Blackholed {0}\n'.format(ipaddress))
+                        logger.info('Blackholed {0}\n'.format(ipaddress))
         except Exception as e:
-            sys.stderr.write('Error handling request.json %r \n'% (e))
+            logger.error('Error handling request.json %r \n' % (e))
 
         return (request, response)

@@ -2,51 +2,25 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 import collections
 import json
-import logging
 import random
 import netaddr
 import sys
 from bson.son import SON
 from datetime import datetime
 from configlib import getConfig, OptionParser
-from logging.handlers import SysLogHandler
 from pymongo import MongoClient
 from collections import Counter
 from kombu import Connection, Exchange
 
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from utilities.toUTC import toUTC
-from elasticsearch_client import ElasticsearchClient
-from query_models import SearchQuery, PhraseMatch
-
-
-logger = logging.getLogger(sys.argv[0])
-
-
-def loggerTimeStamp(self, record, datefmt=None):
-    return toUTC(datetime.now()).isoformat()
-
-
-def initLogger():
-    logger.level = logging.INFO
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    formatter.formatTime = loggerTimeStamp
-    if options.output == 'syslog':
-        logger.addHandler(
-            SysLogHandler(
-                address=(options.sysloghostname, options.syslogport)))
-    else:
-        sh = logging.StreamHandler(sys.stderr)
-        sh.setFormatter(formatter)
-        logger.addHandler(sh)
+from mozdef_util.utilities.logger import logger
+from mozdef_util.utilities.toUTC import toUTC
+from mozdef_util.elasticsearch_client import ElasticsearchClient
+from mozdef_util.query_models import SearchQuery, PhraseMatch
 
 
 def isIPv4(ip):
@@ -72,7 +46,7 @@ def keypaths(nested):
     ''' return a list of nested dict key paths
         like: [u'_source', u'details', u'hostname']
     '''
-    for key, value in nested.iteritems():
+    for key, value in nested.items():
         if isinstance(value, collections.Mapping):
             for subkey, subvalue in keypaths(value):
                 yield [key] + subkey, subvalue
@@ -110,7 +84,7 @@ def mostCommon(listofdicts,dictkeypath):
 def searchESForBROAttackers(es, threshold):
     search_query = SearchQuery(hours=2)
     search_query.add_must([
-        PhraseMatch('category', 'bronotice'),
+        PhraseMatch('category', 'bro'),
         PhraseMatch('details.note', 'MozillaHTTPErrors::Excessive_HTTP_Errors_Attacker')
     ])
     full_results = search_query.execute(es)
@@ -136,18 +110,30 @@ def searchMongoAlerts(mozdefdb):
     # aggregate IPv4 addresses in the most recent alerts
     # to find common attackers.
     ipv4TopHits = alerts.aggregate([
-        {"$sort": {"utcepoch":-1}}, # reverse sort the current alerts
-        {"$limit": 100}, #most recent 100
-        {"$match": {"events.documentsource.details.sourceipaddress":{"$exists": True}}}, # must have an ip address
-        {"$match": {"attackerid":{"$exists": False}}}, # must not be already related to an attacker
-        {"$unwind":"$events"}, #make each event into it's own doc
-        {"$project":{"_id":0,
-                     "sourceip":"$events.documentsource.details.sourceipaddress"}}, #emit the source ip only
-        {"$group": {"_id": "$sourceip", "hitcount": {"$sum": 1}}}, # count by ip
-        {"$match":{"hitcount":{"$gt":5}}}, # limit to those with X observances
-        {"$sort": SON([("hitcount", -1), ("_id", -1)])}, # sort
-        {"$limit": 10} # top 10
-        ])
+        # reverse sort the current alerts
+        {"$sort": {"utcepoch": -1}},
+        # most recent 100
+        {"$limit": 100},
+        # must have an ip address
+        {"$match": {"events.documentsource.details.sourceipaddress": {"$exists": True}}},
+        # must not be already related to an attacker
+        {"$match": {"attackerid": {"$exists": False}}},
+        # make each event into it's own doc
+        {"$unwind": "$events"},
+        {"$project": {
+            "_id": 0,
+            # emit the source ip only
+            "sourceip": "$events.documentsource.details.sourceipaddress"
+        }},
+        # count by ip
+        {"$group": {"_id": "$sourceip", "hitcount": {"$sum": 1}}},
+        # limit to those with X observances
+        {"$match": {"hitcount": {"$gt": options.ipv4attackerhitcount}}},
+        # sort
+        {"$sort": SON([("hitcount", -1), ("_id", -1)])},
+        # top 10
+        {"$limit": 10}
+    ])
     for ip in ipv4TopHits:
         # sanity check ip['_id'] which should be the ipv4 address
         if isIPv4(ip['_id']) and ip['_id'] not in netaddr.IPSet(['0.0.0.0']):
@@ -155,7 +141,7 @@ def searchMongoAlerts(mozdefdb):
             # set CIDR
             # todo: lookup ipwhois for asn_cidr value
             # potentially with a max mask value (i.e. asn is /8, limit attackers to /24)
-            ipcidr.prefixlen = 32
+            ipcidr.prefixlen = options.ipv4attackerprefixlength
 
             # append to or create attacker.
             # does this match an existing attacker's indicators
@@ -244,18 +230,18 @@ def searchMongoAlerts(mozdefdb):
                         # and if they are all the same category
                         # auto-categorize the attacker
                         matchingalerts = alerts.find(
-                            {"attackerid":attacker['_id']}
-                             ).sort('utcepoch', -1).limit(50)
+                            {"attackerid": attacker['_id']}
+                        ).sort('utcepoch', -1).limit(50)
                         # summarize the alert categories
                         # returns list of tuples: [(u'bruteforce', 8)]
                         categoryCounts= mostCommon(matchingalerts,'category')
-                        #are the alerts all the same category?
+                        # are the alerts all the same category?
 
                         if len(categoryCounts) == 1:
-                            #is the alert category mapped to an attacker category?
+                            # is the alert category mapped to an attacker category?
                             for category in options.categorymapping:
-                                if category.keys()[0] == categoryCounts[0][0]:
-                                    attacker['category'] = category[category.keys()[0]]
+                                if list(category.keys())[0] == categoryCounts[0][0]:
+                                    attacker['category'] = category[list(category.keys())[0]]
                                     attackers.save(attacker)
 
 
@@ -289,7 +275,7 @@ def broadcastAttacker(attacker):
         # generate an 'alert' structure for this attacker:
         mqAlert = dict(severity='NOTICE', category='attacker')
 
-        if 'datecreated' in attacker.keys():
+        if 'datecreated' in attacker:
             mqAlert['utctimestamp'] = attacker['datecreated'].isoformat()
 
         mqAlert['summary'] = 'New Attacker: {0} events: {1}, alerts: {2}'.format(attacker['indicators'], attacker['eventscount'], attacker['alertscount'])
@@ -298,9 +284,11 @@ def broadcastAttacker(attacker):
             mqproducer,
             mqproducer.publish,
             max_retries=10)
-        ensurePublish(mqAlert,
+        ensurePublish(
+            mqAlert,
             exchange=alertExchange,
-            routing_key=options.routingkey)
+            routing_key=options.routingkey
+        )
     except Exception as e:
         logger.error('Exception while publishing attacker: {0}'.format(e))
 
@@ -325,40 +313,42 @@ def genNewAttacker():
 
     return newAttacker
 
+
 def updateAttackerGeoIP(mozdefdb, attackerID, eventDictionary):
     '''given an attacker ID and a dictionary of an elastic search event
        look for a valid geoIP in the dict and update the attacker's geo coordinates
     '''
 
     # geo ip should be in eventDictionary['details']['sourceipgeolocation']
-    #"sourceipgeolocation": {
-      #"city": "Polska",
-      #"region_code": "73",
-      #"area_code": 0,
-      #"time_zone": "Europe/Warsaw",
-      #"dma_code": 0,
-      #"metro_code": null,
-      #"country_code3": "POL",
-      #"latitude": 52.59309999999999,
-      #"postal_code": null,
-      #"longitude": 19.089400000000012,
-      #"country_code": "PL",
-      #"country_name": "Poland",
-      #"continent": "EU"
-    #logger.debug(eventDictionary)
-    if 'details' in eventDictionary.keys():
-        if  'sourceipgeolocation' in eventDictionary['details']:
+    # "sourceipgeolocation": {
+    #     "city": "Polska",
+    #     "region_code": "73",
+    #     "area_code": 0,
+    #     "time_zone": "Europe/Warsaw",
+    #     "dma_code": 0,
+    #     "metro_code": null,
+    #     "country_code3": "POL",
+    #     "latitude": 52.59309999999999,
+    #     "postal_code": null,
+    #     "longitude": 19.089400000000012,
+    #     "country_code": "PL",
+    #     "country_name": "Poland",
+    #     "continent": "EU"
+    # }
+    # logger.debug(eventDictionary)
+    if 'details' in eventDictionary:
+        if 'sourceipgeolocation' in eventDictionary['details']:
             attackers=mozdefdb['attackers']
             attacker = attackers.find_one({'_id': attackerID})
             if attacker is not None:
                 attacker['geocoordinates'] = dict(countrycode='',
                                                   longitude=0,
                                                   latitude=0)
-                if 'country_code' in eventDictionary['details']['sourceipgeolocation'].keys():
+                if 'country_code' in eventDictionary['details']['sourceipgeolocation']:
                     attacker['geocoordinates']['countrycode'] = eventDictionary['details']['sourceipgeolocation']['country_code']
-                if 'longitude' in eventDictionary['details']['sourceipgeolocation'].keys():
+                if 'longitude' in eventDictionary['details']['sourceipgeolocation']:
                     attacker['geocoordinates']['longitude'] = eventDictionary['details']['sourceipgeolocation']['longitude']
-                if 'latitude' in eventDictionary['details']['sourceipgeolocation'].keys():
+                if 'latitude' in eventDictionary['details']['sourceipgeolocation']:
                     attacker['geocoordinates']['latitude'] = eventDictionary['details']['sourceipgeolocation']['latitude']
                 attackers.save(attacker)
     else:
@@ -378,10 +368,11 @@ def updateMongoWithESEvents(mozdefdb, results):
                 # potentially with a max mask value (i.e. asn is /8, limit attackers to /24)
                 sourceIP.prefixlen = 24
                 if not sourceIP.ip.is_loopback() and not sourceIP.ip.is_private() and not sourceIP.ip.is_reserved():
-                    esrecord = dict(documentid=r['_id'],
-                         documenttype=r['_type'],
-                         documentindex=r['_index'],
-                         documentsource=r['_source'])
+                    esrecord = dict(
+                        documentid=r['_id'],
+                        documentindex=r['_index'],
+                        documentsource=r['_source']
+                    )
 
                     logger.debug('Trying to find existing attacker at ' + str(sourceIP))
                     attacker = attackers.find_one({'indicators.ipv4address': str(sourceIP)})
@@ -393,7 +384,7 @@ def updateMongoWithESEvents(mozdefdb, results):
                         logger.debug('Creating new attacker from ' + str(sourceIP))
                         newAttacker = genNewAttacker()
 
-                        #expand the source ip to a /24 for the indicator match.
+                        # expand the source ip to a /24 for the indicator match.
                         sourceIP.prefixlen = 24
                         # str sourceIP to get the ip/cidr rather than netblock cidr.
                         newAttacker['indicators'].append(dict(ipv4address=str(sourceIP)))
@@ -465,6 +456,10 @@ def initConfig():
     # set to either amqp or amqps for ssl
     options.mqprotocol = getConfig('mqprotocol', 'amqp', options.configfile)
 
+    # Set these settings to change the correlation for attackers
+    options.ipv4attackerprefixlength = getConfig('ipv4attackerprefixlength', 32, options.configfile)
+    options.ipv4attackerhitcount = getConfig('ipv4ipv4attackerhitcount', 5, options.configfile)
+
 
 if __name__ == '__main__':
     parser = OptionParser()
@@ -475,5 +470,4 @@ if __name__ == '__main__':
         help="configuration file to use")
     (options, args) = parser.parse_args()
     initConfig()
-    initLogger()
     main()

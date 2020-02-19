@@ -1,7 +1,7 @@
-from positive_alert_test_case import PositiveAlertTestCase
-from negative_alert_test_case import NegativeAlertTestCase
+from .positive_alert_test_case import PositiveAlertTestCase
+from .negative_alert_test_case import NegativeAlertTestCase
 
-from alert_test_suite import AlertTestSuite
+from .alert_test_suite import AlertTestSuite
 
 
 class TestPromiscKernel(AlertTestSuite):
@@ -10,13 +10,12 @@ class TestPromiscKernel(AlertTestSuite):
     # This event is the default positive event that will cause the
     # alert to trigger
     default_event = {
-        "_type": "event",
         "_source": {
             "category": "syslog",
             "summary": "device eth0 entered promiscuous mode",
             "hostname": "logging.server.com",
             "details": {
-                "hostname": "random.hacked.server.yours",
+                "program": "kernel",
             }
         }
     }
@@ -25,7 +24,7 @@ class TestPromiscKernel(AlertTestSuite):
     default_alert = {
         "category": "promisc",
         "severity": "WARNING",
-        "summary": "Promiscuous mode enabled on random.hacked.server.yours [10]",
+        "summary": "Promiscuous mode enabled on logging.server.com [10]",
         "tags": ['promisc', 'kernel'],
     }
 

@@ -1,7 +1,7 @@
-from positive_alert_test_case import PositiveAlertTestCase
-from negative_alert_test_case import NegativeAlertTestCase
+from .positive_alert_test_case import PositiveAlertTestCase
+from .negative_alert_test_case import NegativeAlertTestCase
 
-from alert_test_suite import AlertTestSuite
+from .alert_test_suite import AlertTestSuite
 
 
 class TestAlertAuditdCommands(AlertTestSuite):
@@ -40,11 +40,10 @@ class TestAlertAuditdCommands(AlertTestSuite):
     )
 
     event = AlertTestSuite.create_event(default_event)
-    event['_source']['category'] = "someother"
-    event['_source']['tags'] = ["audit", "othervalue"]
+    event['_source']['category'] = "execve"
     test_cases.append(
         PositiveAlertTestCase(
-            description="Positive test case with audit in tags",
+            description="Positive test case with execve as the category",
             events=[event],
             expected_alert=default_alert
         )

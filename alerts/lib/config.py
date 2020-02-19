@@ -2,19 +2,24 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 from celery.schedules import crontab, timedelta
 import time
 import logging
+import os
 
 ALERTS = {
-# 'pythonfile.pythonclass':{'schedule': crontab(minute='*/10')},
-# 'pythonfile.pythonclass':{'schedule': timedelta(minutes=10),'kwargs':dict(hostlist=['nsm3', 'nsm5'])},
+    # 'pythonfile.pythonclass':{'schedule': crontab(minute='*/10')},
+    # 'pythonfile.pythonclass':{'schedule': timedelta(minutes=10),'kwargs':dict(hostlist=['nsm3', 'nsm5'])},
 }
 
 ALERT_PLUGINS = [
+    # 'relative pythonfile name (exclude the .py) - EX: sso_dashboard',
+]
+
+ALERT_ACTIONS = [
     # 'relative pythonfile name (exclude the .py) - EX: sso_dashboard',
 ]
 
@@ -27,9 +32,18 @@ RABBITMQ = {
     'alertqueue': 'mozdef.alert'
 }
 
+es_server = "http://localhost:9200"
+
+if os.getenv('OPTIONS_ESSERVERS'):
+    es_server = os.getenv('OPTIONS_ESSERVERS')
+
 ES = {
-    'servers': ['http://localhost:9200']
+    'servers': [es_server]
 }
+
+RESTAPI_URL = "http://localhost:8081"
+# Leave empty for no auth
+RESTAPI_TOKEN = ""
 
 LOGGING = {
     'version': 1,

@@ -1,13 +1,15 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 import requests
 import json
 import os
-import sys
 from configlib import getConfig, OptionParser
+
+from mozdef_util.utilities.logger import logger
+
 
 class message(object):
     def __init__(self):
@@ -40,9 +42,8 @@ class message(object):
         self.configfile = './plugins/cymon.conf'
         self.options = None
         if os.path.exists(self.configfile):
-            sys.stdout.write('found conf file {0}\n'.format(self.configfile))
+            logger.debug('found conf file {0}\n'.format(self.configfile))
             self.initConfiguration()
-
 
     def onMessage(self, request, response):
         '''
@@ -55,13 +56,11 @@ class message(object):
             request.body.close()
         try:
             requestDict = json.loads(arequest)
-        except ValueError as e:
+        except ValueError:
             response.status = 500
 
-
-        print(requestDict, requestDict.keys())
-        if 'ipaddress' in requestDict.keys():
-            url="https://cymon.io/api/nexus/v1/ip/{0}/events?combined=true&format=json".format(requestDict['ipaddress'])
+        if 'ipaddress' in requestDict:
+            url = "https://cymon.io/api/nexus/v1/ip/{0}/events?combined=true&format=json".format(requestDict['ipaddress'])
 
             # add the cymon api key?
             if self.options is not None:
@@ -74,7 +73,7 @@ class message(object):
             if dresponse.status_code == 200:
                 response.content_type = "application/json"
                 response.body = dresponse.content
-                response.status=200
+                response.status = 200
             else:
                 response.status = dresponse.status_code
 
@@ -82,7 +81,6 @@ class message(object):
             response.status = 500
 
         return (request, response)
-
 
     def initConfiguration(self):
         myparser = OptionParser()
@@ -93,6 +91,5 @@ class message(object):
 
         # cymon options
         self.options.cymonapikey = getConfig('cymonapikey',
-                                        '',
-                                        self.configfile)
-
+                                             '',
+                                             self.configfile)

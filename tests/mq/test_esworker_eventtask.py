@@ -2,24 +2,21 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 import pytz
 import tzlocal
 import datetime
+import os
+import sys
 
 
 def utc_timezone():
     return pytz.timezone('UTC')
 
+
 tzlocal.get_localzone = utc_timezone
-
-
-import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../mq"))
-from mq import esworker_eventtask
 
 
 class MockOptions():
@@ -29,27 +26,35 @@ class MockOptions():
 
 
 class TestKeyMapping():
+    def teardown(self):
+        sys.path.remove(self.mq_path)
+
     def setup(self):
+        if 'lib' in sys.modules:
+            del sys.modules['lib']
+        self.mq_path = os.path.join(os.path.dirname(__file__), "../../mq/")
+        sys.path.insert(0, self.mq_path)
+        from mq import esworker_eventtask
         mock_options = MockOptions()
         esworker_eventtask.options = mock_options
         self.key_mapping = esworker_eventtask.keyMapping
 
     def test_syslog_dict(self):
         syslog_dict = {
-            u'CATEGORY': 'syslog',
-            u'DATE': u'Oct 27 14:01:12',
-            u'FACILITY': u'daemon',
-            u'HOST': u'ub_server',
-            u'HOST_FROM': u'10.1.20.139',
-            u'LEGACY_MSGHDR': u'systemd[1]: ',
-            u'MESSAGE': u'Stopped Getty on tty1.',
-            u'PID': u'1',
-            u'PRIORITY': u'info',
-            u'PROGRAM': u'systemd',
-            u'SEQNUM': u'8',
-            u'SOURCE': u'syslog_tcp',
-            u'SOURCEIP': u'10.1.20.139',
-            u'TAGS': u'.source.syslog_tcp'
+            'CATEGORY': 'syslog',
+            'DATE': 'Oct 27 14:01:12',
+            'FACILITY': 'daemon',
+            'HOST': 'ub_server',
+            'HOST_FROM': '10.1.20.139',
+            'LEGACY_MSGHDR': 'systemd[1]: ',
+            'MESSAGE': 'Stopped Getty on tty1.',
+            'PID': '1',
+            'PRIORITY': 'info',
+            'PROGRAM': 'systemd',
+            'SEQNUM': '8',
+            'SOURCE': 'syslog_tcp',
+            'SOURCEIP': '10.1.20.139',
+            'TAGS': '.source.syslog_tcp'
         }
 
         result = self.key_mapping(syslog_dict)
@@ -59,12 +64,12 @@ class TestKeyMapping():
         assert result['mozdefhostname'] == 'sample'
         assert result['hostname'] == 'ub_server'
         assert result['summary'] == 'Stopped Getty on tty1.'
-        assert result['source'] == 'daemon'
+        assert result['source'] == 'syslog_tcp'
         assert result['receivedtimestamp'] != result['utctimestamp']
         expected_year = datetime.datetime.now().year
         assert result['utctimestamp'] == str(expected_year) + '-10-27T14:01:12+00:00'
         assert result['timestamp'] == str(expected_year) + '-10-27T14:01:12+00:00'
-        assert result['details']['sourceipaddress'] == '10.1.20.139'
+        assert result['details']['eventsourceipaddress'] == '10.1.20.139'
         assert result['tags'] == ['.source.syslog_tcp']
         assert result['category'] == 'syslog'
 
@@ -83,7 +88,7 @@ class TestKeyMapping():
         }
         result = self.key_mapping(message)
         assert result['summary'] == 'example summary'
-        assert result['details'].keys() == ['message', 'payload']
+        assert sorted(result['details'].keys()) == ['message', 'payload']
         assert result['details']['message'] == 'somestring'
         assert result['details']['payload'] == 'examplepayload'
 

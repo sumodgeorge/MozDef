@@ -2,30 +2,20 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
-import os
 import sys
-import logging
 import requests
 import json
 from configlib import getConfig, OptionParser
 from datetime import datetime
-from datetime import timedelta
-from logging.handlers import SysLogHandler
 from httplib2 import Http
 from oauth2client.client import SignedJwtAssertionCredentials
 from apiclient.discovery import build
 
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from utilities.toUTC import toUTC
-
-logger = logging.getLogger(sys.argv[0])
-logger.level=logging.INFO
-formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
+from mozdef_util.utilities.toUTC import toUTC
+from mozdef_util.utilities.logger import logger
 
 
 class State:
@@ -62,7 +52,7 @@ def flattenDict(inDict, pre=None, values=True):
     '''
     pre = pre[:] if pre else []
     if isinstance(inDict, dict):
-        for key, value in inDict.iteritems():
+        for key, value in inDict.items():
             if isinstance(value, dict):
                 for d in flattenDict(value, pre + [key], values):
                     yield d
@@ -75,8 +65,6 @@ def flattenDict(inDict, pre=None, values=True):
                     if values:
                         if isinstance(value, str):
                             yield '.'.join(pre) + '.' + key + '=' + str(value)
-                        elif isinstance(value, unicode):
-                            yield '.'.join(pre) + '.' + key + '=' + value.encode('ascii', 'ignore')
                         elif value is None:
                             yield '.'.join(pre) + '.' + key + '=None'
                     else:
@@ -85,8 +73,6 @@ def flattenDict(inDict, pre=None, values=True):
                     if values:
                         if isinstance(value, str):
                             yield key + '=' + str(value)
-                        elif isinstance(value, unicode):
-                            yield key + '=' + value.encode('ascii', 'ignore')
                         elif value is None:
                             yield key + '=None'
                     else:
@@ -96,13 +82,6 @@ def flattenDict(inDict, pre=None, values=True):
 
 
 def main():
-    if options.output=='syslog':
-        logger.addHandler(SysLogHandler(address=(options.sysloghostname,options.syslogport)))
-    else:
-        sh=logging.StreamHandler(sys.stderr)
-        sh.setFormatter(formatter)
-        logger.addHandler(sh)
-
     logger.debug('started')
     state = State(options.state_file_name)
     try:
@@ -127,7 +106,7 @@ def main():
         # or you will get access denied even with correct delegations/scope
 
         credentials = SignedJwtAssertionCredentials(client_email,
-                                                    private_key,
+                                                    private_key.encode(),
                                                     scope=scope,
                                                     sub=options.impersonate)
         http = Http()
@@ -142,7 +121,7 @@ def main():
 
         # fix up the event craziness to a flatter format
         events=[]
-        if 'items' in response.keys():
+        if 'items' in response:
             for i in response['items']:
                 # flatten the sub dict/lists to pull out the good parts
                 event=dict(category='google')
@@ -155,24 +134,26 @@ def main():
                     # change key/values like:
                     # actor.email=someone@mozilla.com
                     # to actor_email=value
-
-                    key,value =keyValue.split('=')
+                    try:
+                        key,value =keyValue.split('=')
+                    except ValueError as e:
+                        continue
                     key=key.replace('.','_').lower()
                     details[key]=value
 
                 # find important keys
                 # and adjust their location/name
-                if 'ipaddress' in details.keys():
+                if 'ipaddress' in details:
                     # it's the source ip
                     details['sourceipaddress']=details['ipaddress']
                     del details['ipaddress']
 
-                if 'id_time' in details.keys():
+                if 'id_time' in details:
                     event['timestamp']=details['id_time']
                     event['utctimestamp']=details['id_time']
-                if 'events_name' in details.keys():
+                if 'events_name' in details:
                     event['summary']+= details['events_name'] + ' '
-                if 'actor_email' in details.keys():
+                if 'actor_email' in details:
                     event['summary']+= details['actor_email'] + ' '
 
                 event['details']=details
@@ -188,32 +169,32 @@ def main():
         state.data['lastrun'] = lastrun
         state.write_state_file()
     except Exception as e:
-        logger.error("Unhandled exception, terminating: %r"%e)
+        logger.error("Unhandled exception, terminating: %r" % e)
 
 
 def initConfig():
-    options.output=getConfig('output','stdout',options.configfile)                              #output our log to stdout or syslog
-    options.sysloghostname=getConfig('sysloghostname','localhost',options.configfile)           #syslog hostname
-    options.syslogport=getConfig('syslogport',514,options.configfile)                           #syslog port
-    options.url = getConfig('url', 'http://localhost:8080/events', options.configfile)                  #mozdef event input url to post to
+    options.output=getConfig('output','stdout',options.configfile)  # output our log to stdout or syslog
+    options.sysloghostname=getConfig('sysloghostname','localhost',options.configfile)  # syslog hostname
+    options.syslogport=getConfig('syslogport',514,options.configfile)  # syslog port
+    options.url = getConfig('url', 'http://localhost:8080/events', options.configfile)  # mozdef event input url to post to
     options.state_file_name = getConfig('state_file_name','{0}.state'.format(sys.argv[0]),options.configfile)
-    options.recordlimit = getConfig('recordlimit', 1000, options.configfile)                    #max number of records to request
+    options.recordlimit = getConfig('recordlimit', 1000, options.configfile)  # max number of records to request
     #
     # See
     # https://developers.google.com/admin-sdk/reports/v1/guides/delegation
     # for detailed information on delegating a service account for use in gathering google admin sdk reports
     #
 
-    #google's json credential file exported from the project/admin console
+    # google's json credential file exported from the project/admin console
     options.jsoncredentialfile=getConfig('jsoncredentialfile','/path/to/filename.json',options.configfile)
 
-    #email of admin to impersonate as a service account
+    # email of admin to impersonate as a service account
     options.impersonate = getConfig('impersonate', 'someone@yourcompany.com', options.configfile)
 
 
 if __name__ == '__main__':
     parser=OptionParser()
-    parser.add_option("-c", dest='configfile' , default=sys.argv[0].replace('.py', '.conf'), help="configuration file to use")
+    parser.add_option("-c", dest='configfile', default=sys.argv[0].replace('.py', '.conf'), help="configuration file to use")
     (options,args) = parser.parse_args()
     initConfig()
     main()

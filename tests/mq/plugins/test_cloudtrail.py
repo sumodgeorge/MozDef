@@ -1,12 +1,9 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
-import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../mq/plugins"))
-from cloudtrail import message
+from mq.plugins.cloudtrail import message
 
 
 class TestCloudtrailPlugin():
@@ -43,7 +40,7 @@ class TestCloudtrailPlugin():
             'source': 'cloudtrail',
             'details': {
                 'requestparameters': {
-                    'iamInstanceProfile': 'astringvalue',
+                    'iaminstanceprofile': 'astringvalue',
                 }
             }
         }
@@ -53,7 +50,7 @@ class TestCloudtrailPlugin():
             'source': 'cloudtrail',
             'details': {
                 'requestparameters': {
-                    'iamInstanceProfile': {
+                    'iaminstanceprofile': {
                         'raw_value': 'astringvalue',
                     }
                 }
@@ -295,7 +292,7 @@ class TestCloudtrailPlugin():
             'source': 'cloudtrail',
             'details': {
                 'requestparameters': {
-                    'ebsOptimized': 'astringvalue',
+                    'ebsoptimized': 'astringvalue',
                 }
             }
         }
@@ -305,7 +302,7 @@ class TestCloudtrailPlugin():
             'source': 'cloudtrail',
             'details': {
                 'requestparameters': {
-                    'ebsOptimized': {
+                    'ebsoptimized': {
                         'raw_value': 'astringvalue',
                     }
                 }
@@ -319,7 +316,7 @@ class TestCloudtrailPlugin():
             'source': 'cloudtrail',
             'details': {
                 'responseelements': {
-                    'securityGroups': 'astringvalue',
+                    'securitygroups': 'astringvalue',
                 }
             }
         }
@@ -329,7 +326,7 @@ class TestCloudtrailPlugin():
             'source': 'cloudtrail',
             'details': {
                 'responseelements': {
-                    'securityGroups': {
+                    'securitygroups': {
                         'raw_value': 'astringvalue',
                     }
                 }
@@ -343,7 +340,7 @@ class TestCloudtrailPlugin():
             'source': 'cloudtrail',
             'details': {
                 'requestparameters': {
-                    'disableApiTermination': 'astringvalue'
+                    'disableapitermination': 'astringvalue'
                 }
             }
         }
@@ -353,7 +350,31 @@ class TestCloudtrailPlugin():
             'source': 'cloudtrail',
             'details': {
                 'requestparameters': {
-                    'disableApiTermination': {
+                    'disableapitermination': {
+                        'raw_value': 'astringvalue'
+                    }
+                }
+            }
+        }
+        assert retmessage == expected_message
+        assert retmeta == {}
+
+    def test_responseelements_lastModified(self):
+        msg = {
+            'source': 'cloudtrail',
+            'details': {
+                'responseelements': {
+                    'lastmodified': 'astringvalue'
+                }
+            }
+        }
+        (retmessage, retmeta) = self.plugin.onMessage(msg, {})
+
+        expected_message = {
+            'source': 'cloudtrail',
+            'details': {
+                'responseelements': {
+                    'lastmodified': {
                         'raw_value': 'astringvalue'
                     }
                 }
@@ -369,7 +390,7 @@ class TestCloudtrailPlugin():
                 'responseelements': {
                     'findings': {
                         'service': {
-                            'additionalInfo': {
+                            'additionalinfo': {
                                 'unusual': 'astringvalue'
                             }
                         }
@@ -385,7 +406,7 @@ class TestCloudtrailPlugin():
                 'responseelements': {
                     'findings': {
                         'service': {
-                            'additionalInfo': {
+                            'additionalinfo': {
                                 'unusual': {
                                     'raw_value': 'astringvalue'
                                 }

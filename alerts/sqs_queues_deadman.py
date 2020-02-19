@@ -2,14 +2,14 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
-from lib.alerttask import AlertTask
-from query_models import SearchQuery, TermMatch
+from lib.deadman_alerttask import DeadmanAlertTask
+from mozdef_util.query_models import SearchQuery, TermMatch
 
 
-class AlertSQSQueuesDeadman(AlertTask):
+class AlertSQSQueuesDeadman(DeadmanAlertTask):
 
     def main(self):
         self.parse_config('sqs_queues_deadman.conf', ['sqs_queues'])

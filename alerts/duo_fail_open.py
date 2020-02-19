@@ -2,7 +2,7 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 #
 # This script alerts when openvpn's duo security failed to contact the duo server and let the user in.
@@ -10,7 +10,7 @@
 # this case a VPN certificate)
 
 from lib.alerttask import AlertTask
-from query_models import SearchQuery, PhraseMatch
+from mozdef_util.query_models import SearchQuery, PhraseMatch
 
 
 class AlertDuoFailOpen(AlertTask):
@@ -23,7 +23,7 @@ class AlertDuoFailOpen(AlertTask):
 
         # Search aggregations on field 'sourceipaddress', keep X samples of
         # events at most
-        self.searchEventsAggregated('details.hostname', samplesLimit=10)
+        self.searchEventsAggregated('hostname', samplesLimit=10)
         # alert when >= X matching events in an aggregation
         # in this case, always
         self.walkAggregations(threshold=1)

@@ -2,13 +2,13 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 #
 # This code alerts on every successfully opened session on any of the host from a given list
 
 from lib.alerttask import AlertTask
-from query_models import SearchQuery, TermMatch, QueryStringMatch, PhraseMatch
+from mozdef_util.query_models import SearchQuery, TermMatch, QueryStringMatch, PhraseMatch
 
 
 class PromiscKernel(AlertTask):
@@ -27,7 +27,7 @@ class PromiscKernel(AlertTask):
         ])
 
         self.filtersManual(search_query)
-        self.searchEventsAggregated('details.hostname', samplesLimit=10)
+        self.searchEventsAggregated('hostname', samplesLimit=10)
         self.walkAggregations(threshold=1)
 
     def onAggregation(self, aggreg):
@@ -38,4 +38,3 @@ class PromiscKernel(AlertTask):
         summary = 'Promiscuous mode enabled on {1} [{0}]'.format(aggreg['count'], aggreg['value'])
 
         return self.createAlertDict(summary, category, tags, aggreg['events'], severity)
-

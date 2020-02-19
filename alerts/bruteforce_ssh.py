@@ -2,11 +2,11 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 from lib.alerttask import AlertTask
-from query_models import SearchQuery, TermMatch, PhraseMatch, TermsMatch
+from mozdef_util.query_models import SearchQuery, TermMatch, PhraseMatch, TermsMatch
 
 
 class AlertBruteforceSsh(AlertTask):
@@ -18,7 +18,7 @@ class AlertBruteforceSsh(AlertTask):
         search_query.add_must([
             PhraseMatch('summary', 'failed'),
             TermMatch('details.program', 'sshd'),
-            TermsMatch('summary', ['login', 'invalid', 'ldap_count_entries', 'publickey'])
+            TermsMatch('summary', ['login', 'invalid', 'ldap_count_entries', 'publickey', 'keyboard'])
         ])
 
         for ip_address in self.config.skiphosts.split():
@@ -42,7 +42,7 @@ class AlertBruteforceSsh(AlertTask):
         severity = 'NOTICE'
 
         summary = ('{0} ssh bruteforce attempts by {1}'.format(aggreg['count'], aggreg['value']))
-        hosts = self.mostCommon(aggreg['allevents'], '_source.details.hostname')
+        hosts = self.mostCommon(aggreg['allevents'], '_source.hostname')
         for i in hosts[:5]:
             summary += ' {0} ({1} hits)'.format(i[0], i[1])
 

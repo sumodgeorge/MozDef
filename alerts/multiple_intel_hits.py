@@ -2,11 +2,11 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 from lib.alerttask import AlertTask
-from query_models import SearchQuery, TermMatch, ExistsMatch, TermsMatch
+from mozdef_util.query_models import SearchQuery, TermMatch, ExistsMatch, TermsMatch
 
 
 class AlertMultipleIntelHits(AlertTask):
@@ -41,20 +41,20 @@ class AlertMultipleIntelHits(AlertTask):
 
         summary += ' sample hosts that hit it: '
         for e in aggreg['events'][:3]:
-            if 'details' in e['_source'].keys() \
-               and 'sourceipaddress' in e['_source']['details'].keys() \
-               and 'seenwhere' in e['_source']['details'].keys():
+            if 'details' in e['_source'] \
+               and 'sourceipaddress' in e['_source']['details'] \
+               and 'seenwhere' in e['_source']['details']:
                 interestingaddres = ''
                 # someone talking to a bad guy, I want to know who
                 # someone resolving bad guy's domain name, I want to know who
                 # bad guy talking to someone, I want to know to whom
-                if 'Conn::IN_RESP' in e['_source']['details']['seenwhere'] \
-                    or 'HTTP::IN_HOST_HEADER' in e['_source']['details']['seenwhere'] \
-                    or 'DNS::IN_REQUEST' in e['_source']['details']['seenwhere']:
+                if ('Conn::IN_RESP' in e['_source']['details']['seenwhere'] or
+                        'HTTP::IN_HOST_HEADER' in e['_source']['details']['seenwhere'] or
+                        'DNS::IN_REQUEST' in e['_source']['details']['seenwhere']):
                     interestingaddres = e['_source']['details']['sourceipaddress']
-                elif 'Conn::IN_ORIG' in e['_source']['details']['seenwhere'] \
-                    or 'HTTP::IN_X_CLUSTER_CLIENT_IP_HEADER' in e['_source']['details']['seenwhere'] \
-                    or 'HTTP::IN_X_FORWARDED_FOR_HEADER' in e['_source']['details']['seenwhere']:
+                elif ('Conn::IN_ORIG' in e['_source']['details']['seenwhere'] or
+                        'HTTP::IN_X_CLUSTER_CLIENT_IP_HEADER' in e['_source']['details']['seenwhere'] or
+                        'HTTP::IN_X_FORWARDED_FOR_HEADER' in e['_source']['details']['seenwhere']):
                     interestingaddres = e['_source']['details']['destinationipaddress']
 
                 summary += '{0} in {1} '.format(interestingaddres, e['_source']['details']['seenwhere'])

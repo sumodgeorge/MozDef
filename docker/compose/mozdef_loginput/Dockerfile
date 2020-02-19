@@ -1,11 +1,9 @@
-FROM mozdef_base:latest
+FROM mozdef/mozdef_base
 
 LABEL maintainer="mozdef@mozilla.com"
 
-COPY loginput /opt/mozdef/envs/mozdef/loginput
-COPY docker/compose/mozdef_loginput/files/index.conf /opt/mozdef/envs/mozdef/loginput/index.conf
-
-RUN chown -R mozdef:mozdef /opt/mozdef/envs/mozdef/loginput
+COPY --chown=mozdef:mozdef loginput /opt/mozdef/envs/mozdef/loginput
+COPY --chown=mozdef:mozdef docker/compose/mozdef_loginput/files/index.conf /opt/mozdef/envs/mozdef/loginput/index.conf
 
 EXPOSE 8080
 

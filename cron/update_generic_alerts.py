@@ -2,7 +2,7 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 from git import Repo, cmd
@@ -11,8 +11,7 @@ import sys
 import os
 from configlib import getConfig, OptionParser
 
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from utilities.logger import logger, initLogger
+from mozdef_util.utilities.logger import logger, initLogger
 
 
 def download_generic_alerts(repo_url, save_location, deploy_key):

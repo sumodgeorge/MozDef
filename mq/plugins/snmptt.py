@@ -1,9 +1,10 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 import re
+
 
 class message(object):
     def __init__(self):
@@ -17,16 +18,20 @@ class message(object):
         self.regex = re.compile(r'(?P<trapname>\S+) (?P<trapseverity>\S+) "Status Events" (?P<source_host>\S+) - (?P<trappayload>.*)')
 
     def onMessage(self, message, metadata):
-        if 'details' in message.keys():
-            if 'program' in message['details'].keys():
+        if 'details' in message:
+            if 'program' in message['details']:
                 if 'snmptt' == message['details']['program']:
                     msg_unparsed = message['summary']
                     search = re.search(self.regex, msg_unparsed)
                     if search:
                         message['details']['trapname'] = search.group('trapname')
                         message['details']['trapseverity'] = search.group('trapseverity')
-                        message['details']['sourcehostname'] = search.group('source_host')
                         message['details']['trappayload'] = search.group('trappayload')
-                        message['details']['hostname'] = search.group('source_host')
+                        message['hostname'] = search.group('source_host')
+                        # tag the message
+                        if 'tags' in message and isinstance(message['tags'], list):
+                            message['tags'].append('alert')
+                        else:
+                            message['tags'] = ['alert']
 
         return (message, metadata)

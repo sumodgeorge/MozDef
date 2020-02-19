@@ -2,12 +2,13 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 from lib.alerttask import AlertTask
-from query_models import SearchQuery, TermMatch
+from mozdef_util.query_models import SearchQuery, TermMatch
 import re
+import os
 
 # This alert consumes data produced by the MIG sshkey module and mig-runner.
 # ssh key related events are compared against a whitelist which is the
@@ -19,6 +20,7 @@ import re
 # If a host matches the regex, and the detected key matches the path, the
 # alert will not generate an alert event. If the detected key is not in
 # the whitelist, an alert will be created.
+
 
 class SSHKey(AlertTask):
     def __init__(self):
@@ -45,7 +47,8 @@ class SSHKey(AlertTask):
     # Load whitelist from file system and store in object, path specifies the
     # path to load the whitelist from
     def _parse_whitelist(self, path):
-        with open(path) as fd:
+        full_config_filename = os.path.join(os.path.dirname(__file__), path)
+        with open(full_config_filename) as fd:
             lns = [x.strip() for x in fd.readlines()]
             for entry in lns:
                 try:
@@ -55,7 +58,7 @@ class SSHKey(AlertTask):
                 self._whitelist.append({
                     'hostre': entry[:pindex],
                     'path': entry[pindex + 1:]
-                    })
+                })
 
     # Return false if the key path is present in the whitelist, otherwise return
     # true
@@ -65,7 +68,7 @@ class SSHKey(AlertTask):
                 rem = re.compile(went['hostre'])
             except:
                 continue
-            if rem.match(hostname) == None:
+            if rem.match(hostname) is None:
                 continue
             if privkey['path'] == went['path']:
                 return False
@@ -93,6 +96,6 @@ class SSHKey(AlertTask):
         summary = 'Private keys detected on {} missing from whitelist'.format(hostname)
         ret = self.createAlertDict(summary, category, tags, [event], severity)
         ret['details'] = {
-                'private': alertkeys
-                }
+            'private': alertkeys
+        }
         return ret

@@ -1,6 +1,6 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 import os
@@ -23,8 +23,19 @@ class message(object):
         self.offices_code_list = getConfig('offices_code_list', '', config_location).split(',')
 
     def onMessage(self, message, metadata):
-        if 'details' in message.keys() and 'hostname' in message['details'].keys():
-            hostnamesplit = str.lower(message['details']['hostname'].encode('ascii', 'ignore')).split('.')
+        if 'details' in message and 'hostname' in message['details']:
+            hostnamesplit = str.lower(message['details']['hostname']).split('.')
+            if len(hostnamesplit) == 5:
+                if 'mozilla' == hostnamesplit[-2]:
+                    message['details']['site'] = hostnamesplit[-3]
+                    if message['details']['site'] in self.dc_code_list:
+                        message['details']['sitetype'] = 'datacenter'
+                    elif message['details']['site'] in self.offices_code_list:
+                        message['details']['sitetype'] = 'office'
+                    else:
+                        message['details']['sitetype'] = 'unknown'
+        elif 'hostname' in message:
+            hostnamesplit = str.lower(message['hostname']).split('.')
             if len(hostnamesplit) == 5:
                 if 'mozilla' == hostnamesplit[-2]:
                     message['details']['site'] = hostnamesplit[-3]

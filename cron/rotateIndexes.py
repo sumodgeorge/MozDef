@@ -2,7 +2,7 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 # set this to run as a cronjob at 00:00 UTC to create the indexes
@@ -11,24 +11,16 @@
 # Create a starter .conf file with backupDiscover.py
 
 import sys
-import logging
-from logging.handlers import SysLogHandler
 from datetime import datetime
 from datetime import date
 from datetime import timedelta
 from configlib import getConfig, OptionParser
 import json
 
-import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from utilities.toUTC import toUTC
-from elasticsearch_client import ElasticsearchClient
-
-
-logger = logging.getLogger(sys.argv[0])
-logger.level = logging.WARNING
-formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
+from mozdef_util.utilities.toUTC import toUTC
+from mozdef_util.utilities.logger import logger
+from mozdef_util.elasticsearch_client import ElasticsearchClient
 
 
 def daterange(start_date, end_date):
@@ -37,13 +29,6 @@ def daterange(start_date, end_date):
 
 
 def esRotateIndexes():
-    if options.output == 'syslog':
-        logger.addHandler(SysLogHandler(address=(options.sysloghostname, options.syslogport)))
-    else:
-        sh = logging.StreamHandler(sys.stderr)
-        sh.setFormatter(formatter)
-        logger.addHandler(sh)
-
     logger.debug('started')
     with open(options.default_mapping_file, 'r') as mapping_file:
         default_mapping_contents = json.loads(mapping_file.read())
@@ -86,6 +71,12 @@ def esRotateIndexes():
                                     "search.slowlog.threshold.query.warn": options.slowlog_threshold_query_warn,
                                     "search.slowlog.threshold.fetch.warn": options.slowlog_threshold_fetch_warn,
                                     "mapping.total_fields.limit": options.mapping_total_fields_limit
+                                }
+                            }
+                        elif 'alerts' in newindex:
+                            index_settings = {
+                                "index": {
+                                    "number_of_shards": 1
                                 }
                             }
                         default_mapping_contents['settings'] = index_settings
@@ -134,48 +125,48 @@ def initConfig():
         'output',
         'stdout',
         options.configfile
-        )
+    )
     # syslog hostname
     options.sysloghostname = getConfig(
         'sysloghostname',
         'localhost',
         options.configfile
-        )
+    )
     options.syslogport = getConfig(
         'syslogport',
         514,
         options.configfile
-        )
+    )
     options.esservers = list(getConfig(
         'esservers',
         'http://localhost:9200',
         options.configfile).split(',')
-        )
+    )
     options.indices = list(getConfig(
         'backup_indices',
         'events,alerts,.kibana',
         options.configfile).split(',')
-        )
+    )
     options.dobackup = list(getConfig(
         'backup_dobackup',
         '1,1,1',
         options.configfile).split(',')
-        )
+    )
     options.rotation = list(getConfig(
         'backup_rotation',
         'daily,monthly,none',
         options.configfile).split(',')
-        )
+    )
     options.pruning = list(getConfig(
         'backup_pruning',
         '20,0,0',
         options.configfile).split(',')
-        )
+    )
     options.weekly_rotation_indices = list(getConfig(
         'weekly_rotation_indices',
         'events',
         options.configfile).split(',')
-        )
+    )
 
     default_mapping_location = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'defaultMappingTemplate.json')
     options.default_mapping_file = getConfig('default_mapping_file', default_mapping_location, options.configfile)

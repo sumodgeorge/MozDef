@@ -1,16 +1,12 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
-import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../mq/plugins"))
-from parse_sshd import message
 import copy
 
-accept_message = {}
-accept_message['_type'] = 'event'
+from mq.plugins.parse_sshd import message
+
 accept_message = {}
 accept_message['utctimestamp'] = '2017-08-24T22:49:42+00:00'
 accept_message['timestamp'] = '2017-08-24T22:49:42+00:00'
@@ -24,24 +20,23 @@ accept_message['mozdefhostname'] = 'mozdef4.private.scl3.mozilla.com'
 accept_message['eventsource'] = 'systemlogs'
 accept_message['details'] = {}
 accept_message['details']['processid'] = '5413'
-accept_message['details']['Random'] = '9'
 accept_message['details']['sourceipv4address'] = '10.22.74.208'
 accept_message['details']['hostname'] = 'mysuperhost.somewhere.com'
 accept_message['details']['program'] = 'sshd'
 accept_message['details']['sourceipaddress'] = '10.22.74.208'
+accept_message['details']['sourceport'] = '37486'
 
 
 # Short username, RSA fpr present
 class TestSSHDAcceptedMessageV1():
     def setup(self):
-        
+
         self.msgobj = message()
         self.msg = copy.deepcopy(accept_message)
         self.msg['summary'] = 'Accepted publickey for user1 from 10.22.74.208 port 26388 ssh2: RSA 1f:c9:4c:90:bc:fb:72:c7:4d:02:da:07:ed:fe:07:ac'
-    
+
     def test_onMessage(self):
         metadata = {}
-        metadata['doc_type'] = 'event'
 
         (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
 
@@ -55,16 +50,17 @@ class TestSSHDAcceptedMessageV1():
         assert retmessage['details']['sourceipaddress'] == '10.22.74.208'
 
 # Long Username and SHA256 fpr present
+
+
 class TestSSHDAcceptedMessageV2():
     def setup(self):
-        
+
         self.msgobj = message()
         self.msg = copy.deepcopy(accept_message)
         self.msg['summary'] = 'Accepted publickey for user1@domainname.com from 10.22.248.134 port 52216 ssh2: RSA SHA256:1fPhSawXQzFDrJoN2uSos2nGg3wS3oGp15x8/HR+pBc'
-    
+
     def test_onMessage(self):
         metadata = {}
-        metadata['doc_type'] = 'event'
 
         (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
 
@@ -88,7 +84,6 @@ class TestSSHDAcceptedMessageV3():
 
     def test_onMessage(self):
         metadata = {}
-        metadata['doc_type'] = 'event'
 
         (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
 
@@ -109,10 +104,9 @@ class TestSSHDAcceptedMessageV4():
         self.msgobj = message()
         self.msg = copy.deepcopy(accept_message)
         self.msg['summary'] = 'Accepted publickey for user1 from 10.22.74.208 port 26388 ssh2'
-    
+
     def test_onMessage(self):
         metadata = {}
-        metadata['doc_type'] = 'event'
 
         (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
 
@@ -133,10 +127,9 @@ class TestSSHDPAMSessionOpenedMessageV1():
         self.msgobj = message()
         self.msg = copy.deepcopy(accept_message)
         self.msg['summary'] = 'pam_unix(sshd:session): session opened for user user1 by (uid=0)'
-    
+
     def test_onMessage(self):
         metadata = {}
-        metadata['doc_type'] = 'event'
 
         (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
 
@@ -152,10 +145,9 @@ class TestSSHDPAMSessionClosedMessageV1():
         self.msgobj = message()
         self.msg = copy.deepcopy(accept_message)
         self.msg['summary'] = 'pam_unix(sshd:session): session closed for user user1'
-    
+
     def test_onMessage(self):
         metadata = {}
-        metadata['doc_type'] = 'event'
 
         (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
 
@@ -174,7 +166,6 @@ class TestSSHDPostponedMessageV1():
 
     def test_onMessage(self):
         metadata = {}
-        metadata['doc_type'] = 'event'
 
         (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
 
@@ -191,10 +182,9 @@ class TestSSHDPostponedMessageV2():
         self.msgobj = message()
         self.msg = copy.deepcopy(accept_message)
         self.msg['summary'] = 'Postponed publickey for user1 from 10.22.75.209 port 37486 ssh2 [preauth]'
-    
+
     def test_onMessage(self):
         metadata = {}
-        metadata['doc_type'] = 'event'
 
         (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
 
@@ -210,11 +200,10 @@ class TestSSHDPostponedMessageV3():
 
         self.msgobj = message()
         self.msg = copy.deepcopy(accept_message)
-        self.msg['summary'] = 'Postponed publickey for user1@somewhere.com from 10.22.75.209 port 37486 ssh2 [preauth]'
-    
+        self.msg['summary'] = 'Postponed publickey for user1@somewhere.com from 10.22.74.208 port 37486 ssh2 [preauth]'
+
     def test_onMessage(self):
         metadata = {}
-        metadata['doc_type'] = 'event'
 
         (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
 
@@ -231,10 +220,9 @@ class TestSSHDStartingSessionV1():
         self.msgobj = message()
         self.msg = copy.deepcopy(accept_message)
         self.msg['summary'] = 'Starting session: command for user1 from 10.22.128.93 port 51748'
-       
+
     def test_onMessage(self):
         metadata = {}
-        metadata['doc_type'] = 'event'
 
         (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
 
@@ -253,10 +241,9 @@ class TestSSHDStartingSessionV2():
         self.msgobj = message()
         self.msg = copy.deepcopy(accept_message)
         self.msg['summary'] = 'Starting session: shell on pts/0 for user2 from 10.22.252.6 port 59983'
-       
+
     def test_onMessage(self):
         metadata = {}
-        metadata['doc_type'] = 'event'
 
         (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
 
@@ -267,3 +254,97 @@ class TestSSHDStartingSessionV2():
         assert retmessage['details']['sourceipaddress'] == '10.22.252.6'
         assert retmessage['details']['sourceport'] == '59983'
         assert retmessage['details']['device'] == 'pts/0'
+
+
+# Invalid User - complex username
+class TestSSHDUnauthorizedUserV1():
+    def setup(self):
+
+        self.msgobj = message()
+        self.msg = copy.deepcopy(accept_message)
+        self.msg['summary'] = 'Invalid user user@loftydreams.com from 10.22.75.209'
+
+    def test_onMessage(self):
+        metadata = {}
+
+        (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
+
+        assert retmessage is not None
+        assert retmeta is not None
+        assert retmessage['details']['username'] == 'user@loftydreams.com'
+        assert retmessage['details']['sourceipaddress'] == '10.22.75.209'
+
+
+# Input Userauth Request
+class TestSSHDUnauthorizedUsertV2():
+    def setup(self):
+
+        self.msgobj = message()
+        self.msg = copy.deepcopy(accept_message)
+        self.msg['summary'] = 'input_userauth_request: invalid user user1 [preauth]'
+
+    def test_onMessage(self):
+        metadata = {}
+
+        (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
+
+        assert retmessage is not None
+        assert retmeta is not None
+        assert retmessage['details']['username'] == 'user1'
+
+
+# SSH Disconnect - Bye Bye
+class TestSSHDReceivedDisconnectV1():
+    def setup(self):
+
+        self.msgobj = message()
+        self.msg = copy.deepcopy(accept_message)
+        self.msg['summary'] = 'Received disconnect from 10.22.75.209: 2103: Bye Bye [preauth]'
+
+    def test_onMessage(self):
+        metadata = {}
+
+        (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
+
+        assert retmessage is not None
+        assert retmeta is not None
+        assert retmessage['details']['sourceipaddress'] == '10.22.75.209'
+        assert retmessage['details']['sourceport'] == '2103'
+
+
+# SSH Disconnect - normal shutdown
+class TestSSHDReceivedDisconnectV2():
+    def setup(self):
+
+        self.msgobj = message()
+        self.msg = copy.deepcopy(accept_message)
+        self.msg['summary'] = 'Received disconnect from 10.22.75.209: 2103: Normal Shutdown, Thank you for playing [preauth]'
+
+    def test_onMessage(self):
+        metadata = {}
+
+        (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
+
+        assert retmessage is not None
+        assert retmeta is not None
+        assert retmessage['details']['sourceipaddress'] == '10.22.75.209'
+        assert retmessage['details']['sourceport'] == '2103'
+
+
+# SSH Disconnect
+class TestSSHDReceivedDisconnectV3():
+    def setup(self):
+
+        self.msgobj = message()
+        self.msg = copy.deepcopy(accept_message)
+        self.msg['summary'] = 'Received disconnect from 10.22.75.209: 2103:  [preauth]'
+
+    def test_onMessage(self):
+        metadata = {}
+
+        (retmessage, retmeta) = self.msgobj.onMessage(self.msg, metadata)
+
+        assert retmessage is not None
+        assert retmeta is not None
+        assert retmessage['details']['sourceipaddress'] == '10.22.75.209'
+        assert retmessage['details']['sourceport'] == '2103'

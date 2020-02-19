@@ -2,11 +2,11 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 from lib.alerttask import AlertTask
-from query_models import SearchQuery, TermMatch
+from mozdef_util.query_models import SearchQuery, TermMatch
 
 
 class AlertCloudtrailLoggingDisabled(AlertTask):
@@ -15,10 +15,10 @@ class AlertCloudtrailLoggingDisabled(AlertTask):
 
         search_query.add_must([
             TermMatch('source', 'cloudtrail'),
-            TermMatch('eventName', 'StopLogging')
+            TermMatch('details.eventname', 'StopLogging')
         ])
 
-        search_query.add_must_not(TermMatch('errorCode', 'AccessDenied'))
+        search_query.add_must_not(TermMatch('errorcode', 'AccessDenied'))
 
         self.filtersManual(search_query)
         self.searchEventsSimple()
@@ -29,6 +29,6 @@ class AlertCloudtrailLoggingDisabled(AlertTask):
         tags = ['cloudtrail', 'aws', 'cloudtrailpagerduty']
         severity = 'CRITICAL'
 
-        summary = 'Cloudtrail Logging Disabled: ' + event['_source']['requestParameters']['name']
+        summary = 'Cloudtrail Logging Disabled: ' + event['_source']['details']['requestparameters']['name']
 
         return self.createAlertDict(summary, category, tags, [event], severity)

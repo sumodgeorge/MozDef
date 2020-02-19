@@ -2,13 +2,11 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
-from lib.alerttask import AlertTask
-from query_models import SearchQuery, TermMatch, QueryStringMatch, PhraseMatch
-import json
-import sys
+from lib.alerttask import AlertTask, add_hostname_to_ip
+from mozdef_util.query_models import SearchQuery, TermMatch, PhraseMatch
 import re
 import netaddr
 
@@ -71,13 +69,14 @@ import netaddr
 #     ]
 # }
 
+
 class SshLateral(AlertTask):
     def __init__(self):
         AlertTask.__init__(self)
         self._config = self.parse_json_alert_config('ssh_lateral.json')
 
     def main(self):
-        search_query = SearchQuery(minutes=2)
+        search_query = SearchQuery(minutes=15)
         search_query.add_must([
             TermMatch('category', 'syslog'),
             TermMatch('details.program', 'sshd'),
@@ -85,16 +84,16 @@ class SshLateral(AlertTask):
         ])
 
         self.filtersManual(search_query)
-        self.searchEventsAggregated('details.hostname', samplesLimit=10)
+        self.searchEventsAggregated('hostname', samplesLimit=10)
         self.walkAggregations(threshold=1)
 
     # Returns true if the user, host, and source IP fall into an exception
     # listed in the configuration file.
     def exception_check(self, user, host, srcip):
         for x in self._config['exceptions']:
-            if re.match(x[0], user) != None and \
-                re.match(x[1], host) != None and \
-                netaddr.IPAddress(srcip) in netaddr.IPNetwork(x[2]):
+            if re.match(x[0], user) is not None and \
+                    re.match(x[1], host) is not None and \
+                    netaddr.IPAddress(srcip) in netaddr.IPNetwork(x[2]):
                 return True
         return False
 
@@ -107,26 +106,26 @@ class SshLateral(AlertTask):
         # hostmustmatch, and then negate matches using hostmustnotmatch
         if len(aggreg['events']) == 0:
             return None
-        srchost = aggreg['events'][0]['_source']['details']['hostname']
+        srchost = aggreg['events'][0]['_source']['hostname']
         srcmatch = False
         for x in self._config['hostmustmatch']:
-            if re.match(x, srchost) != None:
+            if re.match(x, srchost) is not None:
                 srcmatch = True
                 break
         if not srcmatch:
             return None
         for x in self._config['hostmustnotmatch']:
-            if re.match(x, srchost) != None:
+            if re.match(x, srchost) is not None:
                 return None
 
         # Determine if the origin of the connection was from a source outside
         # of the exception policy, and in our address scope
         candidates = []
-        sampleip = None
-        sampleuser = None
+        source_ips = []
+        users = []
         for x in aggreg['events']:
-            m = re.match('Accepted publickey for (\S+) from (\S+).*', x['_source']['summary'])
-            if m != None and len(m.groups()) == 2:
+            m = re.match(r'Accepted publickey for (\S+) from (\S+).*', x['_source']['summary'])
+            if m is not None and len(m.groups()) == 2:
                 ipaddr = netaddr.IPAddress(m.group(2))
                 for y in self._config['alertifsource']:
                     if ipaddr in netaddr.IPNetwork(y):
@@ -149,15 +148,16 @@ class SshLateral(AlertTask):
                         # Check our exception list
                         if self.exception_check(m.group(1), srchost, m.group(2)):
                             continue
-                        if sampleip == None:
-                            sampleip = m.group(2)
-                        if sampleuser == None:
-                            sampleuser = m.group(1)
+                        source_ips.append(m.group(2))
+                        users.append(m.group(1))
                         candidates.append(x)
         if len(candidates) == 0:
             return None
 
-        summary = 'SSH lateral movement outside policy: access to {} from {} as {}'.format(srchost, sampleip, sampleuser)
+        src_hosts_info = []
+        for source_ip in source_ips:
+            src_hosts_info.append(add_hostname_to_ip(source_ip, '{0} ({1})'))
+
+        summary = 'SSH lateral movement outside policy: access to {} from {} as {}'.format(srchost, ','.join(src_hosts_info), ','.join(users))
 
         return self.createAlertDict(summary, category, tags, aggreg['events'], severity)
-

@@ -2,7 +2,7 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 
@@ -10,10 +10,39 @@ import os
 import json
 import time
 
-import pytest
+from operator import itemgetter
 from dateutil.parser import parse
 
-from rest_test_suite import RestTestSuite
+from .rest_test_suite import RestTestSuite
+
+
+class TestMongoConnection(RestTestSuite):
+    routes = ['/test', '/test/']
+    status_code = 200
+
+    def setup(self):
+        super().setup()
+        self.mongoclient.test_database.tests.insert_one({
+            'name': 'test_item_1',
+            'value': 32
+        })
+
+    def teardown(self):
+        super().teardown()
+        self.mongoclient.test_database.tests.delete_one({
+            'name': 'test_item_1'
+        })
+
+    def test_route_endpoints(self):
+        db = self.mongoclient.test_database
+
+        db.tests.update_one(
+            {'name': 'test_item_1'},
+            {'$inc': {'value': 32}})
+
+        found = db.tests.find_one({'name': 'test_item_1'})
+
+        assert found.get('value') == 64
 
 
 class TestTestRoute(RestTestSuite):
@@ -27,7 +56,7 @@ class TestStatusRoute(RestTestSuite):
     routes = ['/status', '/status/']
 
     status_code = 200
-    body = '{"status": "ok"}'
+    body = '{"status": "ok", "service": "restapi"}'
 
 
 class TestKibanaDashboardsRoute(RestTestSuite):
@@ -35,21 +64,31 @@ class TestKibanaDashboardsRoute(RestTestSuite):
 
     status_code = 200
 
+    def save_dashboard(self, dash_file, dash_name):
+        f = open(dash_file)
+        dashboardjson = json.load(f)
+        f.close()
+        dashid = dash_name.replace(' ', '-')
+        dashid = 'dashboard:{0}'.format(dashid)
+        dashboardjson['dashboard']['title'] = dash_name
+        dashboardjson['type'] = 'dashboard'
+        return self.es_client.save_object(body=dashboardjson, index='.kibana', doc_id=dashid)
+
     def teardown(self):
-        super(TestKibanaDashboardsRoute, self).teardown()
-        if pytest.config.option.delete_indexes:
+        super().teardown()
+        if self.config_delete_indexes:
             self.es_client.delete_index('.kibana', True)
 
     def setup(self):
-        super(TestKibanaDashboardsRoute, self).setup()
-        if pytest.config.option.delete_indexes:
+        super().setup()
+        if self.config_delete_indexes:
             self.es_client.delete_index('.kibana', True)
             self.es_client.create_index('.kibana')
 
         json_dashboard_location = os.path.join(os.path.dirname(__file__), "ssh_dashboard.json")
-        self.es_client.save_dashboard(json_dashboard_location, "Example SSH Dashboard")
-        self.es_client.save_dashboard(json_dashboard_location, "Example FTP Dashboard")
-        self.flush('.kibana')
+        self.save_dashboard(json_dashboard_location, "Example SSH Dashboard")
+        self.save_dashboard(json_dashboard_location, "Example FTP Dashboard")
+        self.refresh('.kibana')
 
     def test_route_endpoints(self):
         for route in self.routes:
@@ -61,13 +100,11 @@ class TestKibanaDashboardsRoute(RestTestSuite):
             assert type(json_resp) == list
             assert len(json_resp) == 2
 
-            json_resp.sort()
-
-            assert json_resp[1]['url'].endswith("/app/kibana#/dashboard/Example-SSH-Dashboard") is True
-            assert json_resp[1]['name'] == 'Example SSH Dashboard'
-
-            assert json_resp[0]['url'].endswith("/app/kibana#/dashboard/Example-FTP-Dashboard") is True
-            assert json_resp[0]['name'] == 'Example FTP Dashboard'
+            sorted_dashboards = sorted(json_resp, key=itemgetter('name'))
+            assert sorted_dashboards[0]['id'] == "Example-FTP-Dashboard"
+            assert sorted_dashboards[0]['name'] == 'Example FTP Dashboard'
+            assert sorted_dashboards[1]['id'] == "Example-SSH-Dashboard"
+            assert sorted_dashboards[1]['name'] == 'Example SSH Dashboard'
 
 
 class TestKibanaDashboardsRouteWithoutDashboards(RestTestSuite):
@@ -76,15 +113,15 @@ class TestKibanaDashboardsRouteWithoutDashboards(RestTestSuite):
     status_code = 200
 
     def setup(self):
-        super(TestKibanaDashboardsRouteWithoutDashboards, self).setup()
-        if pytest.config.option.delete_indexes:
+        super().setup()
+        if self.config_delete_indexes:
             self.es_client.delete_index('.kibana', True)
             self.es_client.create_index('.kibana')
         time.sleep(0.2)
 
     def teardown(self):
-        super(TestKibanaDashboardsRouteWithoutDashboards, self).teardown()
-        if pytest.config.option.delete_indexes:
+        super().teardown()
+        if self.config_delete_indexes:
             self.es_client.delete_index('.kibana', True)
 
     def test_route_endpoints(self):
@@ -96,13 +133,13 @@ class TestKibanaDashboardsRouteWithoutDashboards(RestTestSuite):
             assert json_resp == []
 
 
-class TestLdapLoginsRoute(RestTestSuite):
+class TestLoginCountsRoute(RestTestSuite):
 
-    routes = ['/ldapLogins', '/ldapLogins/']
+    routes = ['/logincounts', '/logincounts/']
     status_code = 200
 
     def setup(self):
-        super(TestLdapLoginsRoute, self).setup()
+        super().setup()
 
         # ttesterson test events
         for count in range(10):
@@ -111,13 +148,15 @@ class TestLdapLoginsRoute(RestTestSuite):
                 "receivedtimestamp": timestamp,
                 "utctimestamp": timestamp,
                 "tags": [
-                    "ldap"
+                    "auth0"
                 ],
                 "timestamp": timestamp,
-                "summary": "LDAP_INVALID_CREDENTIALS ttesterson@mozilla.com,o=com,dc=mozilla srcIP=1.1.1.1",
+                "category": "authentication",
+                "summary": "Failed login from ttesterson@mozilla.com srcIP=1.1.1.1",
                 "details": {
-                    "dn": "ttesterson@mozilla.com,o=com,dc=mozilla",
-                    "result": "LDAP_INVALID_CREDENTIALS",
+                    "username": "ttesterson@mozilla.com",
+                    "type": "Failed Login",
+                    "success": False,
                 }
             }
             self.populate_test_event(event)
@@ -127,13 +166,15 @@ class TestLdapLoginsRoute(RestTestSuite):
                 "receivedtimestamp": timestamp,
                 "utctimestamp": timestamp,
                 "tags": [
-                    "ldap"
+                    "auth0"
                 ],
                 "timestamp": timestamp,
-                "summary": "LDAP_SUCCESS ttesterson@mozilla.com,o=com,dc=mozilla srcIP=1.1.1.1",
+                "category": "authentication",
+                "summary": "Success Login for ttesterson@mozilla.com srcIP=1.1.1.1",
                 "details": {
-                    "dn": "ttesterson@mozilla.com,o=com,dc=mozilla",
-                    "result": "LDAP_SUCCESS",
+                    "username": "ttesterson@mozilla.com",
+                    "type": "Success Login",
+                    "success": True,
                 }
             }
             self.populate_test_event(event)
@@ -145,13 +186,15 @@ class TestLdapLoginsRoute(RestTestSuite):
                 "receivedtimestamp": timestamp,
                 "utctimestamp": timestamp,
                 "tags": [
-                    "ldap"
+                    "auth0"
                 ],
                 "timestamp": timestamp,
-                "summary": "LDAP_INVALID_CREDENTIALS ttester@mozilla.com,o=com,dc=mozilla srcIP=1.1.1.1",
+                "category": "authentication",
+                "summary": "Failed Login from ttester@mozilla.com srcIP=1.1.1.1",
                 "details": {
-                    "dn": "ttester@mozilla.com,o=com,dc=mozilla",
-                    "result": "LDAP_INVALID_CREDENTIALS",
+                    "username": "ttester@mozilla.com",
+                    "type": "Failed Login",
+                    "success": False,
                 }
             }
             self.populate_test_event(event)
@@ -161,13 +204,15 @@ class TestLdapLoginsRoute(RestTestSuite):
                 "receivedtimestamp": timestamp,
                 "utctimestamp": timestamp,
                 "tags": [
-                    "ldap"
+                    "auth0"
                 ],
                 "timestamp": timestamp,
-                "summary": "LDAP_SUCCESS ttester@mozilla.com,o=com,dc=mozilla srcIP=1.1.1.1",
+                "category": "authentication",
+                "summary": "Success Login for ttester@mozilla.com srcIP=1.1.1.1",
                 "details": {
-                    "dn": "ttester@mozilla.com,o=com,dc=mozilla",
-                    "result": "LDAP_SUCCESS",
+                    "username": "ttester@mozilla.com",
+                    "type": "Success Login",
+                    "success": True,
                 }
             }
             self.populate_test_event(event)
@@ -179,13 +224,15 @@ class TestLdapLoginsRoute(RestTestSuite):
                 "receivedtimestamp": timestamp,
                 "utctimestamp": timestamp,
                 "tags": [
-                    "ldap"
+                    "auth0"
                 ],
                 "timestamp": timestamp,
-                "summary": "LDAP_INVALID_CREDENTIALS qwerty@mozillafoundation.org,o=org,dc=mozillafoundation srcIP=1.1.1.1",
+                "category": "authentication",
+                "summary": "Failed Login from qwerty@mozillafoundation.org srcIP=1.1.1.1",
                 "details": {
-                    "dn": "qwerty@mozillafoundation.org,o=org,dc=mozillafoundation",
-                    "result": "LDAP_INVALID_CREDENTIALS",
+                    "username": "qwerty@mozillafoundation.org",
+                    "type": "Failed Login",
+                    "success": False,
                 }
             }
             self.populate_test_event(event)
@@ -195,35 +242,39 @@ class TestLdapLoginsRoute(RestTestSuite):
                 "receivedtimestamp": timestamp,
                 "utctimestamp": timestamp,
                 "tags": [
-                    "ldap"
+                    "auth0"
                 ],
                 "timestamp": timestamp,
-                "summary": "LDAP_SUCCESS qwerty@mozillafoundation.org,o=org,dc=mozillafoundation",
+                "category": "authentication",
+                "summary": "Success Login for qwerty@mozillafoundation.org",
                 "details": {
-                    "dn": "qwerty@mozillafoundation.org,o=org,dc=mozillafoundation",
-                    "result": "LDAP_SUCCESS",
+                    "username": "qwerty@mozillafoundation.org",
+                    "type": "Success Login",
+                    "success": True,
                 }
             }
             self.populate_test_event(event)
 
         for count in range(3):
-            timestamp = RestTestSuite.subtract_from_timestamp({'hours': 2})
+            timestamp = RestTestSuite.subtract_from_timestamp({'hours': 22})
             event = {
                 "receivedtimestamp": timestamp,
                 "utctimestamp": timestamp,
                 "tags": [
-                    "ldap"
+                    "auth0"
                 ],
                 "timestamp": timestamp,
-                "summary": "LDAP_SUCCESS qwerty@mozillafoundation.org,o=org,dc=mozillafoundation",
+                "category": "authentication",
+                "summary": "Success Login for qwerty@mozillafoundation.org",
                 "details": {
-                    "dn": "qwerty@mozillafoundation.org,o=org,dc=mozillafoundation",
-                    "result": "LDAP_SUCCESS",
+                    "username": "qwerty@mozillafoundation.org",
+                    "type": "Success Login",
+                    "success": True,
                 }
             }
             self.populate_test_event(event)
 
-        self.flush('events')
+        self.refresh('events')
 
     def test_route_endpoints(self):
         for route in self.routes:
@@ -235,34 +286,33 @@ class TestLdapLoginsRoute(RestTestSuite):
             assert type(json_resp) == list
             assert len(json_resp) == 3
 
-            json_resp.sort()
-
-            assert json_resp[0].keys() == ['dn', 'failures', 'begin', 'end', 'success']
-            assert json_resp[0]['dn'] == 'qwerty@mozillafoundation.org,o=org,dc=mozillafoundation'
-            assert json_resp[0]['failures'] == 8
-            assert json_resp[0]['success'] == 3
-            assert type(json_resp[0]['begin']) == unicode
+            assert sorted(json_resp[0].keys()) == ['begin', 'end', 'failures', 'success', 'username']
+            assert json_resp[0]['username'] == 'ttesterson@mozilla.com'
+            assert json_resp[0]['failures'] == 10
+            assert json_resp[0]['success'] == 5
+            assert type(json_resp[0]['begin']) == str
             assert parse(json_resp[0]['begin']).tzname() == 'UTC'
-            assert type(json_resp[0]['end']) == unicode
+            assert type(json_resp[0]['end']) == str
             assert parse(json_resp[0]['begin']).tzname() == 'UTC'
 
-            assert json_resp[1].keys() == ['dn', 'failures', 'begin', 'end', 'success']
-            assert json_resp[1]['dn'] == 'ttester@mozilla.com,o=com,dc=mozilla'
+            assert sorted(json_resp[1].keys()) == ['begin', 'end', 'failures', 'success', 'username']
+            assert json_resp[1]['username'] == 'ttester@mozilla.com'
             assert json_resp[1]['failures'] == 9
             assert json_resp[1]['success'] == 7
-            assert type(json_resp[1]['begin']) == unicode
+            assert type(json_resp[1]['begin']) == str
             assert parse(json_resp[1]['begin']).tzname() == 'UTC'
-            assert type(json_resp[1]['end']) == unicode
+            assert type(json_resp[1]['end']) == str
             assert parse(json_resp[1]['begin']).tzname() == 'UTC'
 
-            assert json_resp[2].keys() == ['dn', 'failures', 'begin', 'end', 'success']
-            assert json_resp[2]['dn'] == 'ttesterson@mozilla.com,o=com,dc=mozilla'
-            assert json_resp[2]['failures'] == 10
-            assert json_resp[2]['success'] == 5
-            assert type(json_resp[2]['begin']) == unicode
+            assert sorted(json_resp[2].keys()) == ['begin', 'end', 'failures', 'success', 'username']
+            assert json_resp[2]['username'] == 'qwerty@mozillafoundation.org'
+            assert json_resp[2]['failures'] == 8
+            assert json_resp[2]['success'] == 3
+            assert type(json_resp[2]['begin']) == str
             assert parse(json_resp[2]['begin']).tzname() == 'UTC'
-            assert type(json_resp[2]['end']) == unicode
+            assert type(json_resp[2]['end']) == str
             assert parse(json_resp[2]['begin']).tzname() == 'UTC'
+
 
 # Routes left need to have unit tests written for:
 # @route('/veris')

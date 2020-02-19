@@ -2,52 +2,25 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 import json
-import logging
-import os
 import re
 import sys
-from datetime import datetime
 from configlib import getConfig, OptionParser
-from logging.handlers import SysLogHandler
 from hashlib import md5
 
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from utilities.toUTC import toUTC
-from elasticsearch_client import ElasticsearchClient, ElasticsearchBadServer
-from query_models import SearchQuery, TermMatch, PhraseMatch
-
-logger = logging.getLogger(sys.argv[0])
-
-
-def loggerTimeStamp(self, record, datefmt=None):
-    return toUTC(datetime.now()).isoformat()
-
-
-def initLogger():
-    logger.level = logging.INFO
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    formatter.formatTime = loggerTimeStamp
-    if options.output == 'syslog':
-        logger.addHandler(
-            SysLogHandler(address=(options.sysloghostname,
-                                   options.syslogport)))
-    else:
-        sh = logging.StreamHandler(sys.stderr)
-        sh.setFormatter(formatter)
-        logger.addHandler(sh)
+from mozdef_util.utilities.logger import logger
+from mozdef_util.elasticsearch_client import ElasticsearchClient, ElasticsearchBadServer
+from mozdef_util.query_models import SearchQuery, TermMatch, PhraseMatch
 
 
 def getDocID(usermacaddress):
     # create a hash to use as the ES doc id
     hash = md5()
-    hash.update('{0}.mozdefintel.usernamemacaddress'.format(usermacaddress))
+    seed = '{0}.mozdefintel.usernamemacaddress'.format(usermacaddress)
+    hash.update(seed.encode())
     return hash.hexdigest()
 
 
@@ -64,7 +37,7 @@ def readOUIFile(ouifilename):
     for i in ouifile.readlines()[0::]:
         i=i.strip()
         if '(hex)' in i:
-            #print(i)
+            # print(i)
             fields=i.split('\t')
             macprefix=fields[0][0:8].replace('-',':').lower()
             entity=fields[2]
@@ -79,7 +52,7 @@ def esSearch(es, macassignments=None):
     Expecting an event like: user: username@somewhere.com; mac: 5c:f9:38:b1:de:cf; author reason: roamed session; ssid: ANSSID; AP 46/2\n
     '''
     usermacre=re.compile(r'''user: (?P<username>.*?); mac: (?P<macaddress>.*?); ''',re.IGNORECASE)
-    correlations={} # list of dicts to populate hits we find
+    correlations={}
 
     search_query = SearchQuery(minutes=options.correlationminutes)
     search_query.add_must(TermMatch('details.program', 'AUTHORIZATION-SUCCESS'))
@@ -92,8 +65,8 @@ def esSearch(es, macassignments=None):
         for r in results:
             fields = re.search(usermacre,r['_source']['summary'])
             if fields:
-                if '{0} {1}'.format(fields.group('username'),fields.group('macaddress')) not in correlations.keys():
-                    if fields.group('macaddress')[0:8].lower() in macassignments.keys():
+                if '{0} {1}'.format(fields.group('username'),fields.group('macaddress')) not in correlations:
+                    if fields.group('macaddress')[0:8].lower() in macassignments:
                         entity=macassignments[fields.group('macaddress')[0:8].lower()]
                     else:
                         entity='unknown'
@@ -106,20 +79,21 @@ def esSearch(es, macassignments=None):
     except ElasticsearchBadServer:
         logger.error('Elastic Search server could not be reached, check network connectivity')
 
+
 def esStoreCorrelations(es, correlations):
     for c in correlations:
         event=dict(
-                   utctimestamp=correlations[c]['utctimestamp'],
-                   summary=c,
-                   details=dict(
-                       username=correlations[c]['username'],
-                       macaddress=correlations[c]['macaddress'],
-                       entity=correlations[c]['entity']
-                       ),
-                   category='indicators'
-                   )
+            utctimestamp=correlations[c]['utctimestamp'],
+            summary=c,
+            details=dict(
+                username=correlations[c]['username'],
+                macaddress=correlations[c]['macaddress'],
+                entity=correlations[c]['entity']
+            ),
+            category='indicators'
+        )
         try:
-            es.save_object(index='intelligence', doc_id=getDocID(c), doc_type='usernamemacaddress', body=json.dumps(event))
+            es.save_object(index='intelligence', doc_id=getDocID(c), body=json.dumps(event))
         except Exception as e:
             logger.error("Exception %r when posting correlation " % e)
 
@@ -158,25 +132,22 @@ def initConfig():
     # syslog port
     options.syslogport = getConfig('syslogport', 514, options.configfile)
 
-
     # elastic search server settings
     options.esservers = list(getConfig('esservers',
                                        'http://localhost:9200',
                                        options.configfile).split(','))
 
-
     # default time period in minutes to look back in time for the aggregation
     options.correlationminutes = getConfig('correlationminutes',
-                                         150,
-                                         options.configfile)
+                                           150,
+                                           options.configfile)
 
     # default location of the OUI file from IEEE for resolving mac prefixes
     # Expects the OUI file from IEEE:
     # wget http://www.ieee.org/netstorage/standards/oui.txt
     options.ouifilename = getConfig('ouifilename',
-                                'oui.txt',
-                                options.configfile)
-
+                                    'oui.txt',
+                                    options.configfile)
 
 
 if __name__ == '__main__':
@@ -188,5 +159,4 @@ if __name__ == '__main__':
         help="configuration file to use")
     (options, args) = parser.parse_args()
     initConfig()
-    initLogger()
     main()

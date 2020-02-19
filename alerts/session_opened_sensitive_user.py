@@ -2,14 +2,14 @@
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 #
 # This code alerts on every successfully opened session for any user in the list
 
 import datetime
 from lib.alerttask import AlertTask
-from query_models import SearchQuery, TermMatch, PhraseMatch, QueryStringMatch, RangeMatch
+from mozdef_util.query_models import SearchQuery, TermMatch, PhraseMatch, QueryStringMatch, RangeMatch
 
 
 class SessionOpenedUser(AlertTask):
@@ -57,10 +57,10 @@ class SessionOpenedUser(AlertTask):
         tags = ['pam', 'syslog']
 
         uniquehosts = []
-        sorted_events = sorted(aggreg['events'], key=lambda x: x['_source']['details']['hostname'])
+        sorted_events = sorted(aggreg['events'], key=lambda x: x['_source']['hostname'])
         for e in sorted_events:
-            if e['_source']['details']['hostname'] not in uniquehosts:
-                uniquehosts.append(e['_source']['details']['hostname'])
+            if e['_source']['hostname'] not in uniquehosts:
+                uniquehosts.append(e['_source']['hostname'])
 
         summary = 'Session opened by a sensitive user outside of the expected window - sample hosts: {0} [total {1} hosts]'.format(' '.join(uniquehosts), aggreg['count'])
 

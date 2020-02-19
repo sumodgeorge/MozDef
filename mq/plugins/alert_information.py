@@ -1,6 +1,6 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 
@@ -15,7 +15,7 @@ class message(object):
         self.priority = 20
 
     def onMessage(self, message, metadata):
-        if 'details' in message.keys() and type(message['details']) == dict:
+        if 'details' in message and type(message['details']) == dict:
             if 'alert_information' in message['details'] and type(message['details']['alert_information']) == dict:
                 if 'summary' in message['details']['alert_information']:
                     message['summary'] = message['details']['alert_information']['summary']

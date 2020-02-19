@@ -2,19 +2,21 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 # TODO: Dont use query_models, nicer fixes for AlertTask
 
 from lib.alerttask import AlertTask
-from query_models import SearchQuery, TermMatch, QueryStringMatch
+from mozdef_util.query_models import SearchQuery, TermMatch, QueryStringMatch
+from mozdef_util.utilities.dot_dict import DotDict
+from mozdef_util.utilities.logger import logger
 import hjson
-import logging
 import sys
 import traceback
 import glob
 import os
+from os.path import basename
 
 # Minimum data needed for an alert (this is an example alert json)
 '''
@@ -55,23 +57,6 @@ import os
 '''
 
 
-logger = logging.getLogger()
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-
-class DotDict(dict):
-    '''dict.item notation for dict()'s'''
-    __getattr__ = dict.__getitem__
-    __setattr__ = dict.__setitem__
-    __delattr__ = dict.__delitem__
-
-    def __init__(self, dct):
-        for key, value in dct.items():
-            if hasattr(value, 'keys'):
-                value = DotDict(value)
-            self[key] = value
-
-
 class AlertGenericLoader(AlertTask):
     required_fields = [
         "search_string",
@@ -103,11 +88,16 @@ class AlertGenericLoader(AlertTask):
                 try:
                     cfg = DotDict(hjson.load(fd))
                     self.validate_alert(cfg)
+                    # We set the alert name to the filename (excluding .json)
+                    alert_name = basename(f).replace('.json', '')
+                    cfg['custom_alert_name'] = alert_name
                     self.configs.append(cfg)
                 except Exception:
                     logger.error("Loading rule file {} failed".format(f))
 
     def process_alert(self, alert_config):
+        # Set instance variable to populate event attributes about an alert
+        self.custom_alert_name = "{0}:{1}".format(self.classname(), alert_config['custom_alert_name'])
         search_query = SearchQuery(minutes=int(alert_config.time_window))
         terms = []
         for i in alert_config.filters:
@@ -125,9 +115,10 @@ class AlertGenericLoader(AlertTask):
         for cfg in self.configs:
             try:
                 self.process_alert(cfg)
-            except Exception:
+            except Exception as err:
+                self.error_thrown = err
                 traceback.print_exc(file=sys.stdout)
-                logger.error("Processing rule file {} failed".format(cfg.__str__()))
+                logger.exception("Processing rule file {} failed".format(cfg.__str__()))
 
     def onAggregation(self, aggreg):
         # aggreg['count']: number of items in the aggregation, ex: number of failed login attempts
@@ -139,14 +130,12 @@ class AlertGenericLoader(AlertTask):
         url = aggreg['config']['alert_url']
 
         # Find all affected hosts
-        # Normally, the hostname data is in e.details.hostname so try that first,
+        # Normally, the hostname data is in e.hostname so try that first,
         # but fall back to e.hostname if it is missing, or nothing at all if there's no hostname! ;-)
         hostnames = []
         for e in aggreg['events']:
             event_source = e['_source']
-            if 'details' in event_source and 'hostname' in event_source['details']:
-                hostnames.append(event_source['details']['hostname'])
-            elif 'hostname' in event_source:
+            if 'hostname' in event_source:
                 hostnames.append(event_source['hostname'])
 
         summary = '{} ({}): {}'.format(
@@ -156,6 +145,6 @@ class AlertGenericLoader(AlertTask):
         )
 
         if hostnames:
-            summary += ' [{}]'.format(', '.join(hostnames))
+            summary += ' [{}]'.format(', '.join(set(hostnames)))
 
         return self.createAlertDict(summary, category, tags, aggreg['events'], severity, url)

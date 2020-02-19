@@ -2,12 +2,13 @@
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
-from positive_alert_test_case import PositiveAlertTestCase
-from negative_alert_test_case import NegativeAlertTestCase
-from alert_test_suite import AlertTestSuite
+from .positive_alert_test_case import PositiveAlertTestCase
+from .negative_alert_test_case import NegativeAlertTestCase
+
+from .alert_test_suite import AlertTestSuite
 
 
 class TestSessionOpenedUser(AlertTestSuite):
@@ -16,13 +17,12 @@ class TestSessionOpenedUser(AlertTestSuite):
     # This event is the default positive event that will cause the
     # alert to trigger
     default_event = {
-        "_type": "event",
         "_source": {
             "category": "syslog",
+            "hostname": "exhostname",
             "summary": 'pam_unix(sshd:session): session opened for user user1 by (uid=0)',
             "details": {
                 "program": "sshd",
-                "hostname": "exhostname",
             }
         }
     }
@@ -84,7 +84,7 @@ class TestSessionOpenedUser(AlertTestSuite):
     randomhostsalert['summary'] = "Session opened by a sensitive user outside of the expected window - sample hosts:"
     for event in events:
         randomhostname = 'host' + str(events.index(event))
-        event['_source']['details']['hostname'] = randomhostname
+        event['_source']['hostname'] = randomhostname
         randomhostsalert['summary'] += ' {0}'.format(randomhostname)
     randomhostsalert['summary'] += " [total 10 hosts]"
     test_cases.append(

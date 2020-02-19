@@ -1,5 +1,6 @@
 .DS_Store
 meteor/packages
+meteor/node_modules
 *.pyc
 celebeat-schedule.*
 results
@@ -12,3 +13,10 @@ alerts/generic_alerts
 /.project
 /data
 .vscode
+cloudy_mozdef/aws_parameters.*.json
+cloudy_mozdef/aws_parameters.*.sh
+docs/source/_build
+docs/source/_static
+*.swp
+*.egg-info/
+.python-version

@@ -1,12 +1,12 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
-from positive_alert_test_case import PositiveAlertTestCase
-from negative_alert_test_case import NegativeAlertTestCase
+from .positive_alert_test_case import PositiveAlertTestCase
+from .negative_alert_test_case import NegativeAlertTestCase
 
-from alert_test_suite import AlertTestSuite
+from .alert_test_suite import AlertTestSuite
 
 
 class TestAlertSSHPasswordAuthViolation(AlertTestSuite):
@@ -15,7 +15,6 @@ class TestAlertSSHPasswordAuthViolation(AlertTestSuite):
     # This event is the default positive event that will cause the
     # alert to trigger
     default_event = {
-        "_type": "event",
         "_source": {
             "category": "ssh_password_auth_policy_violation",
             "tags": ["ssh_password_auth_policy_violation"],

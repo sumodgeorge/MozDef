@@ -1,7 +1,7 @@
-from positive_alert_test_case import PositiveAlertTestCase
-from negative_alert_test_case import NegativeAlertTestCase
+from .positive_alert_test_case import PositiveAlertTestCase
+from .negative_alert_test_case import NegativeAlertTestCase
 
-from alert_test_suite import AlertTestSuite
+from .alert_test_suite import AlertTestSuite
 
 
 class TestAlertSSHAccessSignReleng(AlertTestSuite):
@@ -11,13 +11,12 @@ class TestAlertSSHAccessSignReleng(AlertTestSuite):
     # This event is the default positive event that will cause the
     # alert to trigger
     default_event = {
-        "_type": "event",
         "_source": {
             "tags": ["releng"],
+            "hostname": 'host1',
             "summary": 'Accepted publickey for ttesterson from 1.2.3.4 port 39190 ssh2',
             "details": {
                 "sourceipaddress": "1.2.3.4",
-                "hostname": 'host1',
                 "program": 'sshd'
             }
         }
@@ -107,7 +106,7 @@ class TestAlertSSHAccessSignReleng(AlertTestSuite):
     )
 
     event = AlertTestSuite.create_event(default_event)
-    event['_source']['details']['hostname'] = 'badhostname'
+    event['_source']['hostname'] = 'badhostname'
     test_cases.append(
         NegativeAlertTestCase(
             description="Negative test case with bad hostname",
@@ -141,5 +140,15 @@ class TestAlertSSHAccessSignReleng(AlertTestSuite):
         NegativeAlertTestCase(
             description="Negative test case with good event with excluded user and ip from second index",
             events=[event],
+        )
+    )
+
+    event = AlertTestSuite.create_event(default_event)
+    event['_source']['summary'] = '[12345] Accepted publickey for ttesterson from 1.2.3.4 port 39190 ssh2'
+    test_cases.append(
+        PositiveAlertTestCase(
+            description="Positive test case with processid at beginning of summary",
+            events=[event],
+            expected_alert=default_alert
         )
     )

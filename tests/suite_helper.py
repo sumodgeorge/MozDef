@@ -2,20 +2,17 @@
 
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 from configlib import getConfig
 
 from kombu import Connection, Queue, Exchange
 
-
 import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "../lib"))
-from elasticsearch_client import ElasticsearchClient
 
-from utilities.dot_dict import DotDict
+from mozdef_util.elasticsearch_client import ElasticsearchClient
+from mozdef_util.utilities.dot_dict import DotDict
 
 
 # The following functions before the UnitTest class definition
@@ -36,13 +33,19 @@ def parse_config_file():
 
         options.alertExchange = getConfig('alertexchange', 'alerts', options.configfile)
         options.queueName = getConfig('alertqueuename', 'alertBot', options.configfile)
+        options.alertqueue = getConfig('alertqueue', 'mozdef.alert', options.configfile)
         options.alerttopic = getConfig('alerttopic', 'mozdef.*', options.configfile)
 
         options.mquser = getConfig('mquser', 'guest', options.configfile)
         options.mqalertserver = getConfig('mqalertserver', 'localhost', options.configfile)
+        options.mqserver = getConfig('mqserver', 'localhost', options.configfile)
         options.mqpassword = getConfig('mqpassword', 'guest', options.configfile)
         options.mqport = getConfig('mqport', 5672, options.configfile)
         options.mqack = getConfig('mqack', True, options.configfile)
+
+        options.mongohost = getConfig('mongohost', 'localhost', options.configfile)
+        options.mongoport = getConfig('mongoport', 3002, options.configfile)
+
         CONFIG_FILE_CONTENTS = options
 
     return CONFIG_FILE_CONTENTS
@@ -73,10 +76,12 @@ def setup_rabbitmq_client(options):
     try:
         RABBITMQ_CLIENT
     except NameError:
-        mqConnString = 'amqp://{0}:{1}@{2}:{3}//'.format(options.mquser,
-                                                    options.mqpassword,
-                                                    options.mqalertserver,
-                                                    options.mqport)
+        mqConnString = 'amqp://{0}:{1}@{2}:{3}//'.format(
+            options.mquser,
+            options.mqpassword,
+            options.mqalertserver,
+            options.mqport
+        )
         mqAlertConn = Connection(mqConnString)
         alertExchange = Exchange(name=options.alertExchange, type='topic', durable=True, delivery_mode=1)
         alertExchange(mqAlertConn).declare()

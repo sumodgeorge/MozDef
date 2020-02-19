@@ -1,0 +1,14 @@
+kibana /kibana
+alerts /alerts
+ipblocklist /ipblocklist
+fqdnblocklist /fqdnblocklist
+watchlist /watchlist
+investigations /investigations
+incidents /incidents
+visualizations /visualizations
+logincounts /logincounts
+attackers /attackers
+globe /globe
+about /about
+blockip /blockip
+manage-alerts /manage-alerts

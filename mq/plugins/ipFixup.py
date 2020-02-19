@@ -1,6 +1,6 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2014 Mozilla Corporation
 
 import netaddr
@@ -22,7 +22,7 @@ def isIPv6(ip):
 
 def addError(message, error):
     '''add an error note to a message'''
-    if 'errors' not in message.keys():
+    if 'errors' not in message:
         message['errors'] = list()
     if isinstance(message['errors'], list):
         message['errors'].append(error)
@@ -48,28 +48,26 @@ class message(object):
         Also sets ipv4 in two fields:
             ipaddress (decimal mapping IP)
             ipv4address (string mapping)
-            Elastic search is inconsistent about returning IPs as
-            decimal or IPs.
-            In a query an IP field is returned as string.
-            In a facets an IP field is returned as decimal.
-            No ES field type exists for ipv6, so always having
-            a string version is the most flexible option.
+            While the IP field-type serves for IPv4 or IPv6,
+            it is not quite mature yet as kibana lacks filtering
+            to differentiate between IPv4 and IPv6, so always
+            having a string version is the most flexible option.
         '''
 
-        if 'details' in message.keys():
+        if 'details' in message:
             # forwarded header can be spoofed, so try it first,
             # but override later if we've a better field.
-            if 'http_x_forwarded_for' in message['details'].keys():
+            if 'http_x_forwarded_for' in message['details']:
                 # should be a comma delimited list of ips with the original client listed first
                 ipText = message['details']['http_x_forwarded_for'].split(',')[0]
-                if isIPv4(ipText) and 'sourceipaddress' not in message['details'].keys():
+                if isIPv4(ipText) and 'sourceipaddress' not in message['details']:
                     message['details']['sourceipaddress'] = ipText
-                if isIPv4(ipText) and 'sourceipv4address' not in message['details'].keys():
+                if isIPv4(ipText) and 'sourceipv4address' not in message['details']:
                     message['details']['sourceipv4address'] = ipText
-                if isIPv6(ipText) and 'sourceipv6address' not in message['details'].keys():
+                if isIPv6(ipText) and 'sourceipv6address' not in message['details']:
                     message['details']['sourceipv6address'] = ipText
 
-            if 'sourceipaddress' in message['details'].keys():
+            if 'sourceipaddress' in message['details']:
                 ipText = message['details']['sourceipaddress']
                 if isIPv6(ipText):
                     message['details']['sourceipv6address'] = ipText
@@ -82,7 +80,7 @@ class message(object):
                     message['details']['source'] = message['details']['sourceipaddress']
                     message['details']['sourceipaddress'] = None
 
-            if 'destinationipaddress' in message['details'].keys():
+            if 'destinationipaddress' in message['details']:
                 ipText = message['details']['destinationipaddress']
                 if isIPv6(ipText):
                     message['details']['destinationipv6address'] = ipText
@@ -95,7 +93,7 @@ class message(object):
                     message['details']['destination'] = message['details']['destinationipaddress']
                     message['details']['destinationipaddress'] = None
 
-            if 'src' in message['details'].keys():
+            if 'src' in message['details']:
                 ipText = message['details']['src']
                 if isIPv4(ipText):
                     message['details']['sourceipaddress'] = ipText
@@ -103,14 +101,14 @@ class message(object):
                 if isIPv6(ipText):
                     message['details']['sourceipv6address'] = ipText
 
-            if 'srcip' in message['details'].keys():
+            if 'srcip' in message['details']:
                 ipText = message['details']['srcip']
                 if isIPv4(ipText):
                     message['details']['sourceipaddress'] = ipText
                     message['details']['sourceipv4address'] = ipText
                 if isIPv6(ipText):
                     message['details']['sourceipv6address'] = ipText
-            if 'dst' in message['details'].keys():
+            if 'dst' in message['details']:
                 ipText = message['details']['dst']
                 if isIPv4(ipText):
                     message['details']['destinationipaddress'] = ipText
@@ -118,7 +116,7 @@ class message(object):
                 if isIPv6(ipText):
                     message['details']['destinationipv6address'] = ipText
 
-            if 'dstip' in message['details'].keys():
+            if 'dstip' in message['details']:
                 ipText = message['details']['dstip']
                 if isIPv4(ipText):
                     message['details']['destinationipaddress'] = ipText
@@ -126,9 +124,11 @@ class message(object):
                 if isIPv6(ipText):
                     message['details']['destinationipv6address'] = ipText
 
-            if 'cluster_client_ip' in message['details'].keys():
+            if 'cluster_client_ip' in message['details']:
                 ipText = message['details']['cluster_client_ip']
-                if isIPv4(ipText) and 'sourceipaddress' not in message['details'].keys():
+                if isIPv4(ipText):
                     message['details']['sourceipaddress'] = ipText
+                if isIPv6(ipText):
+                    message['details']['sourceipv6address'] = ipText
 
         return (message, metadata)

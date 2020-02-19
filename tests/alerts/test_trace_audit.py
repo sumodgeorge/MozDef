@@ -1,12 +1,12 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
-from positive_alert_test_case import PositiveAlertTestCase
-from negative_alert_test_case import NegativeAlertTestCase
+from .positive_alert_test_case import PositiveAlertTestCase
+from .negative_alert_test_case import NegativeAlertTestCase
 
-from alert_test_suite import AlertTestSuite
+from .alert_test_suite import AlertTestSuite
 
 
 class TestTraceAudit(AlertTestSuite):
@@ -33,9 +33,8 @@ class TestTraceAudit(AlertTestSuite):
     default_alert = {
         "category": "trace",
         "severity": "WARNING",
-        "summary": "5 instances of Strace or Ptrace executed on a system by randomjoe",
+        "summary": "5 instances of Strace or Ptrace executed by randomjoe on exhostname",
         "tags": ['audit'],
-        "notify_mozdefbot": True,
     }
 
     test_cases = []
@@ -100,4 +99,4 @@ class TestTraceAudit(AlertTestSuite):
             description="Negative test case with old timestamp",
             events=events,
         )
-)
+    )

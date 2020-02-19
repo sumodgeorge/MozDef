@@ -1,10 +1,10 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2017 Mozilla Corporation
 
 from lib.alerttask import AlertTask
-from query_models import SearchQuery, TermMatch, ExistsMatch, PhraseMatch
+from mozdef_util.query_models import SearchQuery, TermMatch, ExistsMatch, PhraseMatch
 
 
 class AlertDuoAuthFail(AlertTask):
@@ -13,10 +13,10 @@ class AlertDuoAuthFail(AlertTask):
         search_query = SearchQuery(minutes=15)
 
         search_query.add_must([
-            TermMatch('category', 'event'),
+            TermMatch('category', 'authentication'),
             ExistsMatch('details.sourceipaddress'),
             ExistsMatch('details.username'),
-            PhraseMatch('details.result', 'FRAUD')
+            PhraseMatch('details.result', 'fraud')
         ])
 
         self.filtersManual(search_query)
