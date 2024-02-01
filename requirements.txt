@@ -5,7 +5,7 @@ celery==4.1.0
 celery[sqs]==4.1.0
 configlib==2.0.4
 configparser==3.5.0b2
-cryptography==2.3.1
+cryptography==42.0.2
 dnspython==1.15.0
 duo-client==4.1
 elasticsearch==6.3.1
@@ -33,7 +33,7 @@ python-dateutil==2.6.1
 pytz==2017.3
 PyYAML==5.1.1
 requests-jwt==0.5.3
-requests==2.22.0
+requests==2.31.0
 rsa==3.1.4
 simplejson==3.13.2
 slackclient==1.0.9
