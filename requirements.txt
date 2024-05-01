@@ -37,7 +37,7 @@ requests==2.22.0
 rsa==3.1.4
 simplejson==3.13.2
 slackclient==1.0.9
-supervisor==4.0.3
+supervisor==4.0.4
 tzlocal==1.4
 uwsgi==2.0.17.1
 tldextract==2.2.0
