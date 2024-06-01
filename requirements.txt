@@ -27,7 +27,7 @@ oauth2client==1.4.12
 pyOpenSSL==18.0.0
 pycurl==7.43.0.2
 pycparser==2.17
-pymongo==3.6.1
+pymongo==4.6.3
 pynsive==0.2.6
 python-dateutil==2.6.1
 pytz==2017.3
