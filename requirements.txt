@@ -5,7 +5,7 @@ celery==4.1.0
 celery[sqs]==4.1.0
 configlib==2.0.4
 configparser==3.5.0b2
-cryptography==2.3.1
+cryptography==42.0.8
 dnspython==1.15.0
 duo-client==4.1
 elasticsearch==6.3.1
@@ -42,3 +42,5 @@ tzlocal==1.4
 uwsgi==2.0.17.1
 tldextract==2.2.0
 websocket-client==0.44.0
+urllib3>=2.2.2 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
