@@ -13,7 +13,7 @@
     "dc": "^2.1.10",
     "jquery": "^3.4.0",
     "jquery-ui": "^1.12.1",
-    "meteor-node-stubs": "^0.4.1",
+    "meteor-node-stubs": "^1.2.8",
     "pivottable": "^2.22.0",
     "pnotify": "^3.2.1",
     "three-full": "^11.3.2",
